@@ -1,5 +1,6 @@
 import unittest
 from logger.util import *
+from binascii import crc32
 
 class MyTestCase(unittest.TestCase):
     def test_create(self):
@@ -9,8 +10,35 @@ class MyTestCase(unittest.TestCase):
         log.write('message3')
 
 
-    def test_something(self):
-        self.assertEqual(True, False)
+    def test_order_book_clear(self):
+        ob = OrderBook()
+        ob.clear()
+
+    def test_order_book_set_asksself(self):
+        ob = OrderBook()
+        ob.set_asks(100, 1)
+        print(ob.asks)
+
+    def test_order_book_set_bits(self):
+        ob = OrderBook()
+        ob.set_bids(101, 2)
+        print(ob.bids)
+        ob.set_bids(101, 3)
+        print(ob.bids)
+
+    def test_order_book_to_string(self):
+        ob = OrderBook()
+        ob.set_asks(1, 2)
+        ob.set_asks(1.1, 2)
+        ob.set_asks(1, 0)
+        ob.set_bids(100, 2)
+        ob.set_bids(105, 2)
+        ob.set_bids(101, 2)
+
+        print(ob.to_string())
+
+        print(ob.crc32())
+
 
 
 if __name__ == '__main__':

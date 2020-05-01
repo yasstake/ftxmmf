@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+from binascii import crc32
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 
@@ -102,3 +103,52 @@ class Logger:
     def write(self, message):
         with open(self.log_file_name, "a") as file:
             file.write(message)
+
+
+class OrderBook:
+    def __init__(self):
+        self.bids = None
+        self.asks = None
+        self.clear()
+
+    def clear(self):
+        self.bids = {}
+        self.asks = {}
+
+    def set_bids(self, price, size):
+        if size == 0:
+            del self.bids[price]
+        else:
+            self.bids[price] = size
+
+    def set_asks(self, price, size):
+        if size == 0:
+            del self.asks[price]
+        else:
+            self.asks[price] = size
+
+    def to_string(self):
+        sorted_bids = sorted(self.bids.keys(), reverse=True)
+        sorted_asks = sorted(self.asks.keys())
+
+        print(sorted_asks)
+        print(sorted_bids)
+
+        num_items = min(len(sorted_asks), len(sorted_bids))
+
+        s = ''
+        for i in range(num_items):
+            bid = sorted_bids[i]
+            ask = sorted_asks[i]
+
+            s += str(bid) + ':' + str(self.bids[bid]) + ':'
+            s += str(ask) + ':' + str(self.asks[ask]) + ':'
+
+        if s.endswith(':'):
+            s = s[:-1]
+
+        return s
+
+    def crc32(self):
+        s = self.to_string()
+        return crc32(s.encode())
