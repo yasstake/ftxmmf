@@ -17,8 +17,8 @@ def isotime_to_unix(time: str):
 
 
 def unixtime_to_iso(time):
-    dt = datetime.fromtimestamp(time)
-    iso = dt.date().isoformat() + 'T' + dt.time().isoformat()
+    dt = datetime.utcfromtimestamp(time)
+    iso = dt.date().isoformat() + 'T' + dt.time().isoformat() + 'Z'
     return iso
 
 
@@ -29,7 +29,7 @@ def unixtime_now():
 
 class Logger:
     '''logging file utility'''
-    def __init__(self, log_file_dir=None, flag_file_name=None, id=None):
+    def __init__(self, log_file_dir=None, flag_file_name=None, process_name=None):
         self.log_file_root_name = None
         self.log_file_name = None
 
@@ -38,62 +38,51 @@ class Logger:
         else:
             self.log_file_dir = os.sep + "tmp"
 
+        if process_name:
+            self.process_name = process_name
+        else:
+            self.process_name = 'LOG'
+
         if flag_file_name:
             self.flag_file_name = flag_file_name
         else:
-            self.flag_file_name = os.sep + "tmp" + os.sep + self.get_process_name()
+            self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
-        self.last_time = 0
         self.terminate_count = 200
-        self.terminated_by_peer = False
-        if id:
-            self.pid = id
-        else:
-            self.pid = str(os.getpid())
+        self.pid = str(os.getpid())
 
-        self.reset()
-
-        self.flag_file_name = flag_file_name
-
-        if not self.fix_file:
-            self.rotate_file()
-
-    def get_process_name(self):
-        return 'LOG'
+        self.rotate_file()
+        self.create_terminate_flag()
 
     def __del__(self):
-        # self.dump_message()
         self.rotate_file()
         self.remove_terminate_flag()
 
-    def get_flag_file_name(self):
-        return self.flag_file_name
+    def process_id(self):
+        return self.pid
 
     def create_terminate_flag(self):
         self.remove_terminate_flag()
-        file_name = self.get_flag_file_name()
+        file_name = self.flag_file_name
         with open(file_name + "tmp", "w") as file:
-            file.write(self.get_process_id())
+            file.write(self.process_id())
             file.close()
             os.rename(file_name + "tmp", file_name)
 
     def check_terminate_flag(self):
-        file_name = self.get_flag_file_name()
+        file_name = self.flag_file_name
 
         if os.path.isfile(file_name):
             with open(file_name, "r") as file:
                 id = file.readline()
-                if id != self.get_process_id():
+                if id != self.process_id():
                     self.terminate_count = self.terminate_count - 1
                     if self.terminate_count == 0:
                         return True
         return False
 
-    def get_process_id(self):
-        return self.pid
-
     def remove_terminate_flag(self):
-        file_name = self.get_flag_file_name()
+        file_name = self.flag_file_name
         if os.path.isfile(file_name):
             os.remove(file_name)
 
@@ -104,13 +93,14 @@ class Logger:
 
         time_string = unixtime_to_iso(unixtime_now()).replace(":", "-").replace('+', '-')
 
-        self.log_file_root_name = self.log_file_dir + os.sep + self.get_process_name() + '-' \
-                                  + self.get_process_id() + '-' + time_string + ".log"
+        self.log_file_root_name = self.log_file_dir + os.sep + self.process_name + '-' \
+                                 + time_string + ".log"
 
         self.log_file_name = self.log_file_root_name + ".current"
 
     def write(self, message):
-        file_name = self.log_file_name
+        if self.check_terminate_flag():
+            raise Exception('terminated')
 
-        with open(file_name, "a") as file:
+        with open(self.log_file_name, "a") as file:
             file.write(message)

@@ -71,7 +71,8 @@ class BfClient:
 
     def _board_message_to_csv(self, message: str, channel):
         message = message.replace("'", '"')
-        json_message = json.loads(message, channel)
+        json_message = json.loads(message)
+        return self.board_message_to_csv(json_message, channel)
 
     def board_message_to_csv(self, json_message: json, channel):
         bids = json_message['bids']

@@ -33,6 +33,11 @@ class TestFtxClient(unittest.TestCase):
         print(csv_message)
 
     def test_isotime_to_unix(self):
+        iso_time = ISO_TIME0
+        unix_time = isotime_to_unix(iso_time)
+        print(unix_time)
+        self.assertEqual(unix_time, UNIX_TIME)
+
         iso_time = ISO_TIME
         unix_time = isotime_to_unix(iso_time)
         print(unix_time)

@@ -22,13 +22,16 @@ class FtxClient:
 
         self.ws.on_open = self.on_open
 
+        self.log = Logger(process_name='FTX')
+
     def _wrap_callback(self, f):
         def wrapped_f(ws, *args, **kwargs):
             if ws is self.ws:
                 try:
                     f(ws, *args, **kwargs)
                 except Exception as e:
-                    raise Exception(f'Error running websocket callback: {e}')
+                    print(e)
+                    raise Exception(f'Error running websocket callback: {e}'.format(e))
         return wrapped_f
 
     def on_open(self):
@@ -53,7 +56,7 @@ class FtxClient:
         elif channel == 'trades':
             csv = self.trade_message_to_csv(data)
 
-        print(csv)
+        self.log.write(csv)
 
     def _on_close(self, ws):
         print('close')
@@ -68,10 +71,9 @@ class FtxClient:
     def _board_message_to_csv(self, message: str):
         message = message.replace("'", '"')
         json_message = json.loads(message)
-        return self.board_message_to_csv(message)
+        return self.board_message_to_csv(json_message)
 
     def board_message_to_csv(self, json_message: json):
-
         bids = json_message['bids']
         asks = json_message['asks']
         time = json_message['time']
