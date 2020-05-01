@@ -40,6 +40,16 @@ class MyTestCase(unittest.TestCase):
         print(ob.crc32())
 
 
+    def test_comprss(self):
+        cp = BoardCompress()
+
+        cp.set_bids(100, 1)
+        cp.set_bids(101, 2)
+        cp.set_bids(102, 3)
+        cp.set_asks(103, 0.1)
+        cp.set_asks(104, 0.2)
+
+        print(cp.encode())
 
 if __name__ == '__main__':
     unittest.main()

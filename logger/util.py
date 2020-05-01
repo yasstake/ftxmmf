@@ -149,3 +149,55 @@ class OrderBook:
     def crc32(self):
         s = self.to_string()
         return crc32(s.encode())
+
+
+class BoardCompress:
+    def __init__(self):
+        self.bids = None
+        self.asks = None
+        self.clear()
+
+    def clear(self):
+        self.bids = {}
+        self.asks = {}
+
+    def set_bids(self, price, size):
+        self.bids[price] = size
+
+    def set_asks(self, price, size):
+        self.asks[price] = size
+
+    def make_string(self, value):
+        if int(value) == value:
+            return str(int(value))
+        return str(value)
+
+    def encode(self, compress=True):
+        sorted_bids = sorted(self.bids.keys(), reverse=True)
+
+        s = ''
+        if len(sorted_bids):
+            s = 'B,' + str(len(sorted_bids)) + ','
+            min_bid = sorted_bids[0]
+            s += str(min_bid) + ',' + str(self.bids[min_bid]) + ','
+
+            for bid in sorted_bids[1:]:
+                if compress:
+                    s += self.make_string(min_bid - bid) + ',' + str(self.bids[bid]) + ','
+                else:
+                    s += str(bid) + ',' + str(self.bids[bid]) + ','
+
+        sorted_asks = sorted(self.asks.keys())
+
+        if len(sorted_asks):
+            s += 'A,' + str(len(sorted_asks)) + ','
+            min_ask = sorted_asks[0]
+            s += str(min_ask) + ',' + str(self.asks[min_ask]) + ','
+            for ask in sorted_asks[1:]:
+                if compress:
+                    s += self.make_string(ask - min_ask) + ',' + str(self.asks[ask]) + ','
+                else:
+                    s += str(ask) + ',' + str(self.asks[ask]) + ','
+
+        return s[:-1]
+

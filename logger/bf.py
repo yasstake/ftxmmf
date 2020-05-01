@@ -28,6 +28,7 @@ class BfClient:
         self.ws.on_open = self.on_open
         self.log = Logger(process_name='BF')
         self.current_time = ''
+        self.compress = BoardCompress()
 
     def on_open(self):
         self.ws.send(json.dumps(
@@ -90,15 +91,15 @@ class BfClient:
         return m + '\n'
 
     def _board_to_csv(self, bids, asks):
-        m = 'B,' + str(len(bids)) + ','
+        self.compress.clear()
+
         for board in bids:
-            m += str(board['price']) + ',' + str(board['size']) + ','
+            self.compress.set_bids(board['price'], board['size'])
 
-        m += 'A,' + str(len(asks)) + ','
         for board in asks:
-            m += str(board['price']) + ',' + str(board['size']) + ','
+            self.compress.set_asks(board['price'], board['size'])
 
-        return m
+        return self.compress.encode()
 
     def _trade_message_to_csv(self, message):
         message = message.replace("'", '"')
