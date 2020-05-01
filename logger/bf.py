@@ -29,6 +29,7 @@ class BfClient:
         self.log = Logger(process_name='BF')
         self.current_time = ''
         self.compress = BoardCompress()
+        self.partial = False
 
     def on_open(self):
         self.ws.send(json.dumps(
@@ -46,10 +47,11 @@ class BfClient:
         csv = ''
         if channel == CHANNEL_EXECUTION:
             csv = self.trade_message_to_csv(message)
+            self.log.write(csv)
         elif channel == CHANNEL_BOARD_SNAPSHOT or channel == CHANNEL_BOARD:
             csv = self.board_message_to_csv(message, channel)
-
-        self.log.write(csv)
+            if self.partial:
+                self.log.write(csv)
 
         if self.log.check_terminate_flag():
             self.ws.close()
@@ -80,6 +82,7 @@ class BfClient:
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
             m += 'P,'
+            self.partial = True
         elif channel == CHANNEL_BOARD:
             m += 'U,'
         else:

@@ -23,6 +23,7 @@ class FtxClient:
         )
         self.log = Logger(process_name='FTX')
         self.order_book = OrderBook()
+        self.partial = False
 
     def on_open(self):
         self.send_message('{"op": "subscribe", "channel": "trades", "market": "BTC-PERP"}')
@@ -55,11 +56,14 @@ class FtxClient:
                     print('ERROR: checksum error')
                     self.ws.close()
 
+                self.log.write(csv)
+
             elif channel == 'trades':
                 data = json_message['data']
                 csv = self.trade_message_to_csv(data)
 
-            self.log.write(csv)
+                if self.partial:
+                    self.log.write(csv)
 
         if self.log.check_terminate_flag():
             self.ws.close()
@@ -93,6 +97,7 @@ class FtxClient:
         elif action == 'partial':
             m += 'P,'
             self.order_book.clear()
+            self.partial = True
 
         m += str(time) + ',' + str(checksum) + ','
         m += self._board_to_csv(bids, asks)

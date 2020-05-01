@@ -172,7 +172,7 @@ class BoardCompress:
             return str(int(value))
         return str(value)
 
-    def encode(self, compress=True):
+    def encode(self, compress=False):
         sorted_bids = sorted(self.bids.keys(), reverse=True)
 
         s = ''
