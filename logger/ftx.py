@@ -15,24 +15,12 @@ class FtxClient:
     def __init__(self):
         self.ws = WebSocketApp(
             self._get_url(),
-            on_message=self._wrap_callback(self._on_message),
-            on_close=self._wrap_callback(self._on_close),
-            on_error=self._wrap_callback(self._on_error),
+            on_message=self._on_message,
+            on_close=self._on_close,
+            on_error=self._on_error,
+            on_open=self.on_open
         )
-
-        self.ws.on_open = self.on_open
-
         self.log = Logger(process_name='FTX')
-
-    def _wrap_callback(self, f):
-        def wrapped_f(ws, *args, **kwargs):
-            if ws is self.ws:
-                try:
-                    f(ws, *args, **kwargs)
-                except Exception as e:
-                    print(e)
-                    raise Exception(f'Error running websocket callback: {e}'.format(e))
-        return wrapped_f
 
     def on_open(self):
         self.send_message('{"op": "subscribe", "channel": "trades", "market": "BTC-PERP"}')
@@ -44,25 +32,35 @@ class FtxClient:
     def _get_url(self):
         return FtxClient._ENDPOINT
 
-    def _on_message(self, ws, raw_message: str):
+    def _on_message(self, raw_message: str):
+        print(raw_message)
+
         json_message = json.loads(raw_message)
 
         channel = json_message['channel']
-        data = json_message['data']
+        type =json_message['type']
 
-        csv = ''
-        if channel == 'orderbook':
-            csv = self.board_message_to_csv(data)
-        elif channel == 'trades':
-            csv = self.trade_message_to_csv(data)
+        if type == 'subscribed':
+            print('subscribed', raw_message)
+        else:
+            csv = ''
+            if channel == 'orderbook':
+                data = json_message['data']
+                csv = self.board_message_to_csv(data)
+            elif channel == 'trades':
+                data = json_message['data']
+                csv = self.trade_message_to_csv(data)
 
-        self.log.write(csv)
+            self.log.write(csv)
 
-    def _on_close(self, ws):
+        if self.log.check_terminate_flag():
+            self.ws.close()
+
+    def _on_close(self):
         print('close')
         pass
 
-    def _on_error(self, ws, error):
+    def _on_error(self, error):
         print('error', error)
 
     def connect(self):
@@ -109,6 +107,7 @@ class FtxClient:
         message = message.replace('true', '0')
 
         json_message = json.loads(message)
+        self.trade_message_to_csv(json_message)
 
     def trade_message_to_csv(self, json_message: json):
         m = ''

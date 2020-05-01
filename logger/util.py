@@ -77,7 +77,8 @@ class Logger:
                 id = file.readline()
                 if id != self.process_id():
                     self.terminate_count = self.terminate_count - 1
-                    if self.terminate_count == 0:
+                    print(self.terminate_count)
+                    if self.terminate_count < 0:
                         return True
         return False
 
@@ -99,8 +100,5 @@ class Logger:
         self.log_file_name = self.log_file_root_name + ".current"
 
     def write(self, message):
-        if self.check_terminate_flag():
-            raise Exception('terminated')
-
         with open(self.log_file_name, "a") as file:
             file.write(message)
