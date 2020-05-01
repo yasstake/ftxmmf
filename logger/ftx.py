@@ -1,4 +1,5 @@
 import json
+import atexit
 import websocket
 from websocket import WebSocketApp
 from logger.util import *
@@ -21,6 +22,7 @@ class FtxClient:
             on_open=self.on_open
         )
         self.log = Logger(process_name='FTX')
+        self.order_book = OrderBook()
 
     def on_open(self):
         self.send_message('{"op": "subscribe", "channel": "trades", "market": "BTC-PERP"}')
@@ -46,7 +48,13 @@ class FtxClient:
             csv = ''
             if channel == 'orderbook':
                 data = json_message['data']
-                csv = self.board_message_to_csv(data)
+                csv, checksum = self.board_message_to_csv(data)
+                crc = self.order_book.crc32()
+
+                if crc != checksum:
+                    print('ERROR: checksum error')
+                    self.ws.close()
+
             elif channel == 'trades':
                 data = json_message['data']
                 csv = self.trade_message_to_csv(data)
@@ -57,10 +65,11 @@ class FtxClient:
             self.ws.close()
 
     def _on_close(self):
+        self.log.close()
         print('close')
-        pass
 
     def _on_error(self, error):
+        self.ws.close()
         print('error', error)
 
     def connect(self):
@@ -83,19 +92,26 @@ class FtxClient:
             m += 'U,'
         elif action == 'partial':
             m += 'P,'
+            self.order_book.clear()
 
         m += str(time) + ',' + str(checksum) + ','
         m += self._board_to_csv(bids, asks)
-        return m + '\n'
+        return m + '\n', checksum
 
     def _board_to_csv(self, bids, asks):
         m = 'B,' + str(len(bids)) + ','
         for board in bids:
-            m += str(board[0]) + ',' + str(board[1]) + ','
+            bid_price = board[0]
+            bid_size = board[1]
+            m += str(bid_price) + ',' + str(bid_size) + ','
+            self.order_book.set_bids(bid_price, bid_size)
 
         m += 'A,' + str(len(asks)) + ','
         for board in asks:
-            m += str(board[0]) + ',' + str(board[1]) + ','
+            ask_price = board[0]
+            ask_size = board[1]
+            m += str(ask_price) + ',' + str(ask_size) + ','
+            self.order_book.set_asks(ask_price, ask_size)
 
         return m
 
@@ -148,6 +164,7 @@ class FtxClient:
 if __name__ == '__main__':
     websocket.enableTrace(True)
     client = FtxClient()
+    atexit.register(client._on_close)
     client.connect()
 
 

@@ -2,7 +2,7 @@ import json
 import websocket
 from websocket import WebSocketApp
 from logger.util import *
-from datetime import datetime
+import atexit
 
 try:
     import thread
@@ -20,21 +20,14 @@ class BfClient:
     def __init__(self):
         self.ws = WebSocketApp(
             self._get_url(),
-            on_message=self._wrap_callback(self._on_message),
-            on_close=self._wrap_callback(self._on_close),
-            on_error=self._wrap_callback(self._on_error),
+            on_message=self._on_message,
+            on_close=self.on_close,
+            on_error=self._on_error
         )
 
         self.ws.on_open = self.on_open
-
-    def _wrap_callback(self, f):
-        def wrapped_f(ws, *args, **kwargs):
-            if ws is self.ws:
-                try:
-                    f(ws, *args, **kwargs)
-                except Exception as e:
-                    raise Exception(f'Error running websocket callback: {e}')
-        return wrapped_f
+        self.log = Logger(process_name='BF')
+        self.current_time = ''
 
     def on_open(self):
         self.ws.send(json.dumps(
@@ -43,27 +36,31 @@ class BfClient:
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD}}
              ]))
 
-    def _on_message(self, ws, message):
+    def _on_message(self, message):
         json_message = json.loads(message)
 
         channel = json_message['params']['channel']
         message = json_message['params']['message']
 
+        csv = ''
         if channel == CHANNEL_EXECUTION:
             csv = self.trade_message_to_csv(message)
-            print(csv)
         elif channel == CHANNEL_BOARD_SNAPSHOT or channel == CHANNEL_BOARD:
             csv = self.board_message_to_csv(message, channel)
-            print(csv)
+
+        self.log.write(csv)
+
+        if self.log.check_terminate_flag():
+            self.ws.close()
 
     def _get_url(self):
         return _END_POINT
 
-    def _on_close(self, ws):
-        print('close')
-        pass
+    def on_close(self):
+        self.log.close()
 
-    def _on_error(self, ws, error):
+    def _on_error(self, error):
+        self.ws.close()
         print('error', error)
 
     def connect(self):
@@ -77,7 +74,7 @@ class BfClient:
     def board_message_to_csv(self, json_message: json, channel):
         bids = json_message['bids']
         asks = json_message['asks']
-        time = str(int(unixtime_now()))
+        time = str(self.current_time)
 
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
@@ -116,6 +113,7 @@ class BfClient:
 
     def single_trade_message(self, message):
         time = message['exec_date']
+        self.current_time = isotime_to_unix(time)
         side = message['side']
         price = message['price']
         size = message['size']
@@ -146,6 +144,7 @@ class BfClient:
 if __name__ == '__main__':
     websocket.enableTrace(True)
     client = BfClient()
+    atexit.register(client.on_close)
     client.connect()
 
 

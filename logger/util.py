@@ -55,7 +55,7 @@ class Logger:
         self.rotate_file()
         self.create_terminate_flag()
 
-    def __del__(self):
+    def close(self):
         self.rotate_file()
         self.remove_terminate_flag()
 
@@ -130,9 +130,6 @@ class OrderBook:
     def to_string(self):
         sorted_bids = sorted(self.bids.keys(), reverse=True)
         sorted_asks = sorted(self.asks.keys())
-
-        print(sorted_asks)
-        print(sorted_bids)
 
         num_items = min(len(sorted_asks), len(sorted_bids))
 
