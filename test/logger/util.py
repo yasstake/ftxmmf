@@ -51,5 +51,18 @@ class MyTestCase(unittest.TestCase):
 
         print(cp.encode())
 
+    def test_create_table(self):
+        h5file = open_file('./test.h5', mode='w', title='testfile')
+        group = h5file.create_group('/', 'LOG', 'log info')
+
+        table = h5file.create_table(group, 'log', LogRecord, 'log_data')
+        log_record = table.row
+
+        for i in range(10):
+            log_record['time'] = 1000 + i
+            log_record['action'] = 1
+            log_record.append()
+
+
 if __name__ == '__main__':
     unittest.main()

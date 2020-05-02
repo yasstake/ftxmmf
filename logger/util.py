@@ -1,10 +1,26 @@
 from datetime import datetime
 import os
 from binascii import crc32
+from tables import *
+import numpy as np
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
+NANO_SEC = 1_000_000.0
 
-def isotime_to_unix(time: str):
+
+def to_nsec(sec):
+    return int(sec * NANO_SEC)
+
+
+def to_msec(nsec):
+    return int(nsec/1000.0)
+
+
+def to_sec(nsec):
+    return nsec / NANO_SEC
+
+
+def isotime_to_unix(time: str, ns=False):
     if time.endswith('Z'):
         time = time[:-1]
         time_len = len(time)
@@ -14,18 +30,46 @@ def isotime_to_unix(time: str):
             time = time + '0' * (ISO_FORMAT_LEN - time_len)
         time += '+00:00'
     dt = datetime.fromisoformat(time)
-    return dt.timestamp()
+    time_stamp = dt.timestamp()
+
+    if ns:
+        time_stamp = to_nsec(time_stamp)
+
+    return time_stamp
 
 
-def unixtime_to_iso(time):
+def unixtime_to_iso(time, ns=False):
+    if ns:
+        time = to_sec(time)
+
     dt = datetime.utcfromtimestamp(time)
     iso = dt.date().isoformat() + 'T' + dt.time().isoformat() + 'Z'
     return iso
 
 
-def unixtime_now():
+def unixtime_now(ns=False):
     dt = datetime.utcnow()
-    return dt.timestamp()
+
+    time = dt.timestamp()
+
+    if ns:
+        time = to_nsec(time)
+
+    return time
+
+
+class Action:
+    # board
+    PARTIAL = 1
+    UPDATE_BIT = 2
+    UPDATE_ASK = 3
+
+    # trade
+    TRADE_LONG = 4
+    TRADE_LONG_LIQUID = 5
+
+    TRADE_SHORT = 6
+    TRADE_SHORT_LIQUID = 7
 
 
 class Logger:
@@ -33,6 +77,9 @@ class Logger:
     def __init__(self, log_file_dir=None, flag_file_name=None, process_name=None):
         self.log_file_root_name = None
         self.log_file_name = None
+        self.last_action = None
+        self.last_time = None
+        self.last_index = None
 
         if log_file_dir:
             self.log_file_dir = log_file_dir
@@ -103,6 +150,32 @@ class Logger:
     def write(self, message):
         with open(self.log_file_name, "a") as file:
             file.write(message)
+
+    def write_check_sum(self, checksum):
+        self.write(str(checksum))
+
+    def write_action(self, action, time, price, size, id=None, price_in_100c=True):
+        if id:
+            self.last_index = id
+        elif self.last_action == action and self.last_time == time:
+            self.last_index += 1
+        else:
+            self.last_action = action
+            self.last_time = time
+            self.last_index = 0
+
+        s = '\n' + str(action) + ',' + str(time) + ',' + str(self.last_index) + ','
+        if price is not None:
+            if price_in_100c:
+                s += str(int(price*10))
+            else:
+                s += str(price)
+        s += ','
+        if size is not None:
+            s += str(size)
+        s += ','
+
+        self.write(s)
 
 
 class OrderBook:
@@ -200,4 +273,12 @@ class BoardCompress:
                     s += str(ask) + ',' + str(self.asks[ask]) + ','
 
         return s[:-1]
+
+
+class LogRecord(IsDescription):
+    action = UInt8Col()   # Action class
+    time = UInt64Col()    # nano sec
+    index = UInt32Col()   # index or id
+    price = Float32Col()  # price in USD or JPY
+    size = Float16Col()   # volume in BTC
 

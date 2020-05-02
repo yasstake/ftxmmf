@@ -78,5 +78,21 @@ class TestFtxClient(unittest.TestCase):
         print(unix_time)
         print(unixtime_to_iso(unix_time))
 
+    def test_unix_time_only(self):
+        iso_time_now  = '2020-04-30T23:59:59.999999Z'
+        iso_time_day = '2020-04-30T00:00:00.000000Z'
+
+        unix_now = isotime_to_unix(iso_time_now, True)
+        unix_day = isotime_to_unix(iso_time_day, True)
+
+        print(unix_now, unix_day, unix_now - unix_day, 2**32)
+        print(unix_now - unix_day)
+        print(2 ** 32)
+        print(unix_now)
+        print(2 ** 64)
+        print(int(2 ** 64 / 1000))
+
+
+
 if __name__ == '__main__':
     unittest.main()

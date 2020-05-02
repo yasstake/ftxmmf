@@ -10,6 +10,29 @@ except ImportError:
     import _thread as thread
 
 
+class LogConverter:
+    def __init__(self):
+        self.last_action = None
+        self.last_time = None
+        self.last_index = 0
+
+    def open_file(self, file_from, file_to):
+
+        pass
+
+    def read_line(self, line):
+        pass
+
+    def on_partial_line(self, line):
+        pass
+
+    def on_update_line(self, line):
+        pass
+
+    def on_trade_line(self, line):
+        pass
+
+
 class FtxClient:
     _ENDPOINT = 'wss://ftx.com/ws/'
 
@@ -36,12 +59,10 @@ class FtxClient:
         return FtxClient._ENDPOINT
 
     def _on_message(self, raw_message: str):
-        print(raw_message)
-
         json_message = json.loads(raw_message)
 
         channel = json_message['channel']
-        type =json_message['type']
+        type = json_message['type']
 
         if type == 'subscribed':
             print('subscribed', raw_message)
@@ -52,18 +73,18 @@ class FtxClient:
                 csv, checksum = self.board_message_to_csv(data)
                 crc = self.order_book.crc32()
 
-                if crc != checksum:
+                if crc != checksum and self.partial:
                     print('ERROR: checksum error')
                     self.ws.close()
 
-                self.log.write(csv)
-
+                # self.log.write(csv)
             elif channel == 'trades':
                 data = json_message['data']
                 csv = self.trade_message_to_csv(data)
 
                 if self.partial:
-                    self.log.write(csv)
+                    pass
+                    # self.log.write(csv)
 
         if self.log.check_terminate_flag():
             self.ws.close()
@@ -88,6 +109,7 @@ class FtxClient:
         bids = json_message['bids']
         asks = json_message['asks']
         time = json_message['time']
+        time = to_nsec(time)
         checksum = json_message['checksum']
         action = json_message['action']
         m = ""
@@ -98,18 +120,20 @@ class FtxClient:
             m += 'P,'
             self.order_book.clear()
             self.partial = True
+            self.log.write_action(Action.PARTIAL, time, None, None)
 
         m += str(time) + ',' + str(checksum) + ','
-        m += self._board_to_csv(bids, asks)
+        m += self._board_to_csv(bids, asks, time, checksum)
         return m + '\n', checksum
 
-    def _board_to_csv(self, bids, asks):
+    def _board_to_csv(self, bids, asks, time, checksum):
         m = 'B,' + str(len(bids)) + ','
         for board in bids:
             bid_price = board[0]
             bid_size = board[1]
             m += str(bid_price) + ',' + str(bid_size) + ','
             self.order_book.set_bids(bid_price, bid_size)
+            self.log.write_action(Action.UPDATE_BIT, time, bid_price, bid_size)
 
         m += 'A,' + str(len(asks)) + ','
         for board in asks:
@@ -117,6 +141,10 @@ class FtxClient:
             ask_size = board[1]
             m += str(ask_price) + ',' + str(ask_size) + ','
             self.order_book.set_asks(ask_price, ask_size)
+            self.log.write_action(Action.UPDATE_ASK, time, ask_price, ask_size)
+
+        if len(bids) or len(asks):
+            self.log.write_check_sum(checksum)
 
         return m
 
@@ -145,10 +173,13 @@ class FtxClient:
         id = message['id']
 
         m = ''
+        action = 0
         if side == 'sell':
             m += 'S'
+            action = Action.TRADE_SHORT
         elif side == 'buy':
             m += 'B'
+            action = Action.TRADE_LONG
         else:
             print('ERROR')
 
@@ -156,14 +187,17 @@ class FtxClient:
             m += '0,'
         else:
             m += '1,'
+            action += 1
 
-        m += str(isotime_to_unix(time)) + ','
+        unix_time = isotime_to_unix(time, True)
+        m += str(unix_time) + ','
         m += str(id) + ','
         m += str(price) + ','
         m += str(size) + '\n'
 
-        return m
+        self.log.write_action(action, unix_time, price, size, id)
 
+        return m
 
 
 if __name__ == '__main__':
