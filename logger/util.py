@@ -348,15 +348,10 @@ class LogLoader:
         self.h5file.close()
 
     def load(self, log_file):
-        command = 'wc -l {}'.format(log_file)
-        output = subprocess.check_output(command, shell=True).decode()
-        total_lines = int(output.split()[0])
-        progress_bar = tqdm(total=total_lines)
 
         with open(log_file) as f:
             reader = csv.reader(f)
-            for row in reader:
-                progress_bar.update(1)
+            for row in tqdm(reader):
                 if len(row) == 0:
                     continue
 
