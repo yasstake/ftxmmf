@@ -90,6 +90,7 @@ class Logger:
         self.last_action = None
         self.last_time = None
         self.last_index = None
+        self._enable = False
 
         if log_file_dir:
             self.log_file_dir = log_file_dir
@@ -131,13 +132,16 @@ class Logger:
 
         if os.path.isfile(file_name):
             with open(file_name, "r") as file:
-                id = file.readline()
-                if id != self.process_id():
+                pid = file.readline()
+                if pid != self.process_id():
                     self.terminate_count = self.terminate_count - 1
                     print(self.terminate_count)
                     if self.terminate_count < 0:
                         return True
         return False
+
+    def set_enable(self):
+        self._enable = True
 
     def remove_terminate_flag(self):
         file_name = self.flag_file_name
@@ -157,6 +161,9 @@ class Logger:
         self.log_file_name = self.log_file_root_name + ".current"
 
     def write(self, message):
+        if not self._enable:
+            return
+
         with open(self.log_file_name, "a") as file:
             file.write(message)
 
@@ -290,6 +297,7 @@ class LogRecord(IsDescription):
     index = UInt32Col()  # index or id
     price = UInt32Col()  # price in USD(100c) or JPY(1Yen)
     size = Float32Col()  # volume in BTC
+
 
 class LogLoader:
     def __init__(self):

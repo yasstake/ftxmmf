@@ -46,12 +46,10 @@ class FtxClient:
 
         if type == 'subscribed':
             print('subscribed', raw_message)
-            self.log.create_terminate_flag()
         else:
-            csv = ''
             if channel == 'orderbook':
                 data = json_message['data']
-                csv, checksum = self.board_message_to_csv(data)
+                checksum = self.board_message_to_csv(data)
                 crc = self.order_book.crc32()
 
                 if crc != checksum and self.partial:
@@ -61,18 +59,14 @@ class FtxClient:
                 # self.log.write(csv)
             elif channel == 'trades':
                 data = json_message['data']
-                csv = self.trade_message_to_csv(data)
+                self.trade_message_to_csv(data)
 
-                if self.partial:
-                    pass
-                    # self.log.write(csv)
-
-        if self.log.check_terminate_flag():
+        if self.partial and self.log.check_terminate_flag():
             self.ws.close()
 
     def _on_close(self):
         self.log.close()
-        print('close')
+        print('connection closed')
 
     def _on_error(self, error):
         self.ws.close()
@@ -84,7 +78,7 @@ class FtxClient:
     def _board_message_to_csv(self, message: str):
         message = message.replace("'", '"')
         json_message = json.loads(message)
-        return self.board_message_to_csv(json_message)
+        self.board_message_to_csv(json_message)
 
     def board_message_to_csv(self, json_message: json):
         bids = json_message['bids']
@@ -93,41 +87,35 @@ class FtxClient:
         time = to_nsec(time)
         checksum = json_message['checksum']
         action = json_message['action']
-        m = ""
 
-        if action == 'update':
-            m += 'U,'
-        elif action == 'partial':
-            m += 'P,'
+        if action == 'partial':
+            if not self.partial:
+                self.partial = True
+                self.log.set_enable()
+                self.log.create_terminate_flag()
+
             self.order_book.clear()
-            self.partial = True
             self.log.write_action(Action.PARTIAL, time, None, None)
 
-        m += str(time) + ',' + str(checksum) + ','
-        m += self._board_to_csv(bids, asks, time, checksum)
-        return m + '\n', checksum
+        self._board_to_csv(bids, asks, time, checksum)
+
+        return checksum
 
     def _board_to_csv(self, bids, asks, time, checksum):
-        m = 'B,' + str(len(bids)) + ','
         for board in bids:
             bid_price = board[0]
             bid_size = board[1]
-            m += str(bid_price) + ',' + str(bid_size) + ','
             self.order_book.set_bids(bid_price, bid_size)
             self.log.write_action(Action.UPDATE_BIT, time, bid_price, bid_size)
 
-        m += 'A,' + str(len(asks)) + ','
         for board in asks:
             ask_price = board[0]
             ask_size = board[1]
-            m += str(ask_price) + ',' + str(ask_size) + ','
             self.order_book.set_asks(ask_price, ask_size)
             self.log.write_action(Action.UPDATE_ASK, time, ask_price, ask_size)
 
         if len(bids) or len(asks):
             self.log.write_check_sum(checksum)
-
-        return m
 
     def _trade_message_to_csv(self, message: str):
         message = message.replace("'", '"')
@@ -140,10 +128,8 @@ class FtxClient:
         self.trade_message_to_csv(json_message)
 
     def trade_message_to_csv(self, json_message: json):
-        m = ''
         for execute in json_message:
-            m += self.single_trade_message(execute)
-        return m
+            self.single_trade_message(execute)
 
     def single_trade_message(self, message):
         time = message['time']
@@ -153,32 +139,19 @@ class FtxClient:
         liquidation = message['liquidation']
         id = message['id']
 
-        m = ''
         action = 0
         if side == 'sell':
-            m += 'S'
             action = Action.TRADE_SHORT
         elif side == 'buy':
-            m += 'B'
             action = Action.TRADE_LONG
         else:
             print('ERROR')
 
-        if liquidation == 0:
-            m += '0,'
-        else:
-            m += '1,'
+        if liquidation == 1:
             action += 1
 
         unix_time = isotime_to_unix(time, True)
-        m += str(unix_time) + ','
-        m += str(id) + ','
-        m += str(price) + ','
-        m += str(size) + '\n'
-
         self.log.write_action(action, unix_time, price, size, id)
-
-        return m
 
 
 if __name__ == '__main__':

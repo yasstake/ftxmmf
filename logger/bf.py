@@ -27,8 +27,7 @@ class BfClient:
 
         self.ws.on_open = self.on_open
         self.log = Logger(process_name='BF')
-        self.current_time = ''
-        self.compress = BoardCompress()
+        self.current_time = None
         self.partial = False
 
     def on_open(self):
@@ -44,16 +43,14 @@ class BfClient:
         channel = json_message['params']['channel']
         message = json_message['params']['message']
 
-        csv = ''
         if channel == CHANNEL_EXECUTION:
-            csv = self.trade_message_to_csv(message)
-            self.log.write(csv)
+            self.trade_message_to_csv(message)
         elif channel == CHANNEL_BOARD_SNAPSHOT or channel == CHANNEL_BOARD:
-            csv = self.board_message_to_csv(message, channel)
-            if self.partial:
-                self.log.write(csv)
+            self.board_message_to_csv(message, channel)
+        else:
+            print('other channel', channel)
 
-        if self.log.check_terminate_flag():
+        if self.partial and self.log.check_terminate_flag():
             self.ws.close()
 
     def _get_url(self):
@@ -61,6 +58,7 @@ class BfClient:
 
     def on_close(self):
         self.log.close()
+        print('connection closed')
 
     def _on_error(self, error):
         self.ws.close()
@@ -72,7 +70,7 @@ class BfClient:
     def _board_message_to_csv(self, message: str, channel):
         message = message.replace("'", '"')
         json_message = json.loads(message)
-        return self.board_message_to_csv(json_message, channel)
+        self.board_message_to_csv(json_message, channel)
 
     def board_message_to_csv(self, json_message: json, channel):
         bids = json_message['bids']
@@ -81,68 +79,50 @@ class BfClient:
 
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
-            m += 'P,'
-            self.partial = True
-        elif channel == CHANNEL_BOARD:
-            m += 'U,'
-        else:
-            print("ERROR")
+            if not self.partial and self.current_time:
+                self.partial = True
+                self.log.set_enable()
+                self.log.create_terminate_flag()
+            self.log.write_action(Action.PARTIAL, time, None, None)
 
-        m += str(time) + ',' + '0' + ','
-        m += self._board_to_csv(bids, asks)
-
-        return m + '\n'
+        self._board_to_csv(bids, asks)
 
     def _board_to_csv(self, bids, asks):
-        self.compress.clear()
-
         for board in bids:
-            self.compress.set_bids(board['price'], board['size'])
+            price, size = board['price'], board['size']
+            self.log.write_action(Action.UPDATE_BIT, self.current_time, price, size)
 
         for board in asks:
-            self.compress.set_asks(board['price'], board['size'])
-
-        return self.compress.encode()
+            price, size = board['price'], board['size']
+            self.log.write_action(Action.UPDATE_ASK, self.current_time, price, size)
 
     def _trade_message_to_csv(self, message):
         message = message.replace("'", '"')
-        print(message)
         json_message = json.loads(message)
+        self.trade_message_to_csv(json_message)
 
     def trade_message_to_csv(self, json_message):
-        m = ''
         for execute in json_message:
-            m += self.single_trade_message(execute)
-        return m
+            self.single_trade_message(execute)
 
     def single_trade_message(self, message):
         time = message['exec_date']
-        self.current_time = isotime_to_unix(time)
+        time = isotime_to_unix(time, ns=True)
+        self.current_time = time
         side = message['side']
         price = message['price']
         size = message['size']
         id = message['id']
-        liquidation = 0
 
-        m = ''
+        action = 0
         if side == 'SELL':
-            m += 'S'
+            action = Action.TRADE_SHORT
         elif side == 'BUY':
-            m += 'B'
+            action = Action.TRADE_LONG
         else:
             print('ERROR')
 
-        if liquidation == 0:
-            m += '0,'
-        else:
-            m += '1,'
-
-        m += str(id) + ','
-        m += str(isotime_to_unix(time)) + ','
-        m += str(price) + ','
-        m += str(size) + '\n'
-
-        return m
+        self.log.write_action(action, time, price, size, id)
 
 
 if __name__ == '__main__':
