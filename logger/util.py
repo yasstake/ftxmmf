@@ -5,6 +5,8 @@ from tables import *
 import numpy as np
 import csv
 import tables
+import subprocess
+from tqdm import tqdm
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 NANO_SEC = 1_000_000.0
@@ -14,12 +16,8 @@ def to_nsec(sec):
     return int(sec * NANO_SEC)
 
 
-def to_msec(nsec):
-    return int(nsec/1000.0)
-
-
 def to_sec(nsec):
-    return nsec / NANO_SEC
+    return float(nsec) / NANO_SEC
 
 
 def isotime_to_unix(time: str, ns=False):
@@ -46,6 +44,16 @@ def unixtime_to_iso(time, ns=False):
 
     dt = datetime.utcfromtimestamp(time)
     iso = dt.date().isoformat() + 'T' + dt.time().isoformat() + 'Z'
+    return iso
+
+
+def unix_time_to_date(time, ns=False):
+    if ns:
+        time = to_sec(time)
+
+    dt = datetime.utcfromtimestamp(time)
+    iso = dt.date().isoformat()
+
     return iso
 
 
@@ -102,7 +110,6 @@ class Logger:
         self.pid = str(os.getpid())
 
         self.rotate_file()
-        self.create_terminate_flag()
 
     def close(self):
         self.rotate_file()
@@ -279,11 +286,10 @@ class BoardCompress:
 
 class LogRecord(IsDescription):
     action = UInt8Col()  # Action class
-    time = UInt64Col()  # nano sec
+    time = Int64Col()    # nano sec
     index = UInt32Col()  # index or id
     price = UInt32Col()  # price in USD(100c) or JPY(1Yen)
     size = Float32Col()  # volume in BTC
-
 
 class LogLoader:
     def __init__(self):
@@ -294,13 +300,44 @@ class LogLoader:
         self.board_record = None
         self.trade_record = None
 
+    @staticmethod
+    def parse_line(row):
+        action = int(row[0])
+        time = int(row[1])
+        index = int(row[2])
+        price = row[3]
+        if price == '':
+            price = 0
+        else:
+            price = int(price)
+
+        size = row[4]
+        if size == '':
+            size = 0
+        else:
+            size = float(size)
+
+        return action, time, index, price, size
+
     def open_db(self, file_name):
         FILTERS = tables.Filters(complib='zlib', complevel=9)
-        self.h5file = tables.open_file('./test.h5', mode='w', title='testfile', filters=FILTERS)
-        log_group = self.h5file.create_group('/', 'LOG', 'BOARDINFO')
+        self.h5file = tables.open_file(file_name, mode='a', title='testfile', filters=FILTERS)
 
-        self.board_table = self.h5file.create_table(log_group, 'board', LogRecord, 'board data')
-        self.trade_table = self.h5file.create_table(log_group, 'execute', LogRecord, 'execute data')
+        log_group = None
+
+        if '/LOG' in self.h5file:
+            log_group = self.h5file.get_node('/LOG')
+            self.board_table = log_group.board
+            self.trade_table = log_group.trade
+        else:
+            # create group and tables
+            log_group = self.h5file.create_group('/', 'LOG', 'Log directory')
+            self.board_table = self.h5file.create_table(log_group, 'board', LogRecord, 'board data')
+            self.board_table.cols.time.create_index()
+            self.board_table.cols.index.create_index()
+            self.trade_table = self.h5file.create_table(log_group, 'trade', LogRecord, 'trade data')
+            self.trade_table.cols.time.create_index()
+            self.trade_table.cols.index.create_index()
 
         self.board_record = self.board_table.row
         self.trade_record = self.trade_table.row
@@ -310,41 +347,46 @@ class LogLoader:
         self.trade_table.flush()
         self.h5file.close()
 
-
     def load(self, log_file):
+        command = 'wc -l {}'.format(log_file)
+        output = subprocess.check_output(command, shell=True).decode()
+        total_lines = int(output.split()[0])
+        progress_bar = tqdm(total=total_lines)
+
         with open(log_file) as f:
             reader = csv.reader(f)
             for row in reader:
+                progress_bar.update(1)
                 if len(row) == 0:
                     continue
 
-                action = int(row[0])
-                time = int(row[1])
-                index = int(row[2])
-                price = row[3]
-                if price == '':
-                    price = 0
-                else:
-                    price = int(price)
-
-                size = row[4]
-                if size == '':
-                    size = 0
-                else:
-                    size = float(size)
+                action, time, index, price, size = LogLoader.parse_line(row)
 
                 record = None
+                table = None
                 if action == Action.PARTIAL or \
                     action == Action.UPDATE_ASK or \
                     action == Action.UPDATE_BIT:
                     record = self.board_record
+                    table = self.board_table
                 elif action == Action.TRADE_LONG or \
                     action == Action.TRADE_SHORT or \
                     action == Action.TRADE_LONG_LIQUID or \
                     action == Action.TRADE_SHORT_LIQUID:
                     record = self.trade_record
+                    table = self.trade_table
                 else:
                     print('unknown actionERROR', action, record)
+
+                '''
+                # check if exists
+                query = '(time=={}) & (index=={})'.format(time, index)
+                # query = '(time=={}) & (action=={})'.format(time, action)
+                rows = table.read_where(query)
+
+                if len(rows):
+                    continue
+                '''
 
                 record['action'] = action
                 record['time'] = time

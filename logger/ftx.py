@@ -46,6 +46,7 @@ class FtxClient:
 
         if type == 'subscribed':
             print('subscribed', raw_message)
+            self.log.create_terminate_flag()
         else:
             csv = ''
             if channel == 'orderbook':

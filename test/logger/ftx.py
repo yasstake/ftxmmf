@@ -92,6 +92,13 @@ class TestFtxClient(unittest.TestCase):
         print(2 ** 64)
         print(int(2 ** 64 / 1000))
 
+    def test_unix_time_to_date(self):
+        unixtime = UNIX_TIME
+
+        date_string = unix_time_to_date(unixtime)
+
+        print(date_string)
+
 
 
 if __name__ == '__main__':
