@@ -3,6 +3,7 @@ import atexit
 import websocket
 from websocket import WebSocketApp
 from logger.util import *
+import csv
 
 try:
     import thread
@@ -10,27 +11,6 @@ except ImportError:
     import _thread as thread
 
 
-class LogConverter:
-    def __init__(self):
-        self.last_action = None
-        self.last_time = None
-        self.last_index = 0
-
-    def open_file(self, file_from, file_to):
-
-        pass
-
-    def read_line(self, line):
-        pass
-
-    def on_partial_line(self, line):
-        pass
-
-    def on_update_line(self, line):
-        pass
-
-    def on_trade_line(self, line):
-        pass
 
 
 class FtxClient:

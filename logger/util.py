@@ -3,6 +3,8 @@ import os
 from binascii import crc32
 from tables import *
 import numpy as np
+import csv
+import tables
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 NANO_SEC = 1_000_000.0
@@ -276,9 +278,101 @@ class BoardCompress:
 
 
 class LogRecord(IsDescription):
-    action = UInt8Col()   # Action class
-    time = UInt64Col()    # nano sec
-    index = UInt32Col()   # index or id
-    price = Float32Col()  # price in USD or JPY
-    size = Float16Col()   # volume in BTC
+    action = UInt8Col()  # Action class
+    time = UInt64Col()  # nano sec
+    index = UInt32Col()  # index or id
+    price = UInt32Col()  # price in USD(100c) or JPY(1Yen)
+    size = Float32Col()  # volume in BTC
+
+
+class LogLoader:
+    def __init__(self):
+        self.h5file = None
+        self.board_table = None
+        self.trade_table = None
+
+        self.board_record = None
+        self.trade_record = None
+
+    def open_db(self, file_name):
+        FILTERS = tables.Filters(complib='zlib', complevel=9)
+        self.h5file = tables.open_file('./test.h5', mode='w', title='testfile', filters=FILTERS)
+        log_group = self.h5file.create_group('/', 'LOG', 'BOARDINFO')
+
+        self.board_table = self.h5file.create_table(log_group, 'board', LogRecord, 'board data')
+        self.trade_table = self.h5file.create_table(log_group, 'execute', LogRecord, 'execute data')
+
+        self.board_record = self.board_table.row
+        self.trade_record = self.trade_table.row
+
+    def close_db(self):
+        self.board_table.flush()
+        self.trade_table.flush()
+        self.h5file.close()
+
+
+    def load(self, log_file):
+        with open(log_file) as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) == 0:
+                    continue
+
+                action = int(row[0])
+                time = int(row[1])
+                index = int(row[2])
+                price = row[3]
+                if price == '':
+                    price = 0
+                else:
+                    price = int(price)
+
+                size = row[4]
+                if size == '':
+                    size = 0
+                else:
+                    size = float(size)
+
+                record = None
+                if action == Action.PARTIAL or \
+                    action == Action.UPDATE_ASK or \
+                    action == Action.UPDATE_BIT:
+                    record = self.board_record
+                elif action == Action.TRADE_LONG or \
+                    action == Action.TRADE_SHORT or \
+                    action == Action.TRADE_LONG_LIQUID or \
+                    action == Action.TRADE_SHORT_LIQUID:
+                    record = self.trade_record
+                else:
+                    print('unknown actionERROR', action, record)
+
+                record['action'] = action
+                record['time'] = time
+                record['index'] = index
+                record['price'] = price
+                record['size'] = size
+                record.append()
+
+
+
+import sys
+
+if __name__ == '__main__':
+    argc = len(sys.argv)
+
+    logfile = None
+    db_file = './logdb.hd5'
+    if argc == 2:
+        logfile = sys.argv[1]
+    elif argc == 3:
+        logfile = sys.argv[1]
+        db_file = sys.argv[2]
+    else:
+        print('[usage] util.py logfile.log [dbfile.hd5]')
+        exit(-1)
+
+    loader = LogLoader()
+    loader.open_db(db_file)
+    loader.load(logfile)
+    loader.close_db()
 

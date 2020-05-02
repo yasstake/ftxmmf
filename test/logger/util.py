@@ -64,5 +64,11 @@ class MyTestCase(unittest.TestCase):
             log_record.append()
 
 
+    def test_log_loder(self):
+        loader = LogLoader()
+        loader.open_db('./test.hd5')
+        loader.load('./test.log')
+
+
 if __name__ == '__main__':
     unittest.main()
