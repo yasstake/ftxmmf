@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python -m logger.util $1 $2
+python -m logger.table $1 $2

@@ -1,6 +1,8 @@
 import unittest
+
+from logger.table import LogRecord
 from logger.util import *
-from binascii import crc32
+
 
 class MyTestCase(unittest.TestCase):
     def test_create(self):
@@ -65,7 +67,7 @@ class MyTestCase(unittest.TestCase):
 
 
     def test_log_loder(self):
-        loader = LogLoader()
+        loader = LogTable()
         loader.open_db('./test.hd5')
         loader.load('./test.log')
 

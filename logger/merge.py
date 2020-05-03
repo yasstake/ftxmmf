@@ -1,8 +1,5 @@
 from glob import glob
-import os
-import sys
 import csv
-from logger.util import LogLoader
 from logger.util import *
 
 
@@ -78,7 +75,7 @@ class LogMerge:
             for row in reader:
                 if len(row) == 0:
                     continue
-                action, time, index, price, size = LogLoader.parse_line(row)
+                action, time, index, price, size = LogTable.parse_line(row)
                 yield action, time, index, price, size
 
     def output_file_name(self, date):
