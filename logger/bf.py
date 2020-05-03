@@ -17,7 +17,7 @@ CHANNEL_BOARD = 'lightning_board_FX_BTC_JPY'
 
 
 class BfClient:
-    def __init__(self):
+    def __init__(self, log_dir=None):
         self.ws = WebSocketApp(
             self._get_url(),
             on_message=self._on_message,
@@ -26,7 +26,7 @@ class BfClient:
         )
 
         self.ws.on_open = self.on_open
-        self.log = Logger(process_name='BF')
+        self.log = Logger(log_file_dir=log_dir, process_name='BF')
         self.current_time = None
         self.partial = False
 
@@ -125,9 +125,16 @@ class BfClient:
         self.log.write_action(action, time, price, size, id)
 
 
+
+import sys
+
 if __name__ == '__main__':
+    log_dir = None
+    if len(sys.argv) == 2:
+        log_dir = sys.argv[1]
+
     websocket.enableTrace(True)
-    client = BfClient()
+    client = BfClient(log_dir=log_dir)
     atexit.register(client.on_close)
     client.connect()
 

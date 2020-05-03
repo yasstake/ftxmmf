@@ -11,12 +11,10 @@ except ImportError:
     import _thread as thread
 
 
-
-
 class FtxClient:
     _ENDPOINT = 'wss://ftx.com/ws/'
 
-    def __init__(self):
+    def __init__(self, log_dir=None):
         self.ws = WebSocketApp(
             self._get_url(),
             on_message=self._on_message,
@@ -24,7 +22,7 @@ class FtxClient:
             on_error=self._on_error,
             on_open=self.on_open
         )
-        self.log = Logger(process_name='FTX')
+        self.log = Logger(log_file_dir=log_dir, process_name='FTX')
         self.order_book = OrderBook()
         self.partial = False
 
@@ -153,10 +151,15 @@ class FtxClient:
         unix_time = isotime_to_unix(time, True)
         self.log.write_action(action, unix_time, price, size, id)
 
+import sys
 
 if __name__ == '__main__':
+    log_dir = None
+    if len(sys.argv) == 2:
+        log_dir = sys.argv[1]
+
     websocket.enableTrace(True)
-    client = FtxClient()
+    client = FtxClient(log_dir)
     atexit.register(client._on_close)
     client.connect()
 
