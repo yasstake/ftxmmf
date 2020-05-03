@@ -11,7 +11,7 @@ class LogMerge:
         if out_path:
             self.out_path = out_path
         else:
-            self.out_path = './'
+            self.out_path = './MERGE'
 
         self.log_files = files
         self.log_file_index = 0
@@ -60,7 +60,7 @@ class LogMerge:
                     break
 
     def update_write_file_name(self, time):
-        self.current_file = self.out_path + os.sep + unix_time_to_date(time, True) + '.log'
+        self.current_file = self.out_path + '-' + unix_time_to_date(time, True) + '.log'
 
     def write(self, action, time, index, price, size):
         if not self.current_file or action == Action.PARTIAL:
@@ -87,20 +87,28 @@ class LogMerge:
 
 
 if __name__ == '__main__':
+    prefix = ''
+    path = ''
+
     argc = len(sys.argv)
 
-    print(argc)
-    if argc != 2:
-        print('python -m logger.merge path_to_log')
+    if argc == 2:
+        path = sys.argv[1]
+    elif argc == 3:
+        path = sys.argv[1]
+        prefix = sys.argv[2]
+    else:
+        print('python -m logger.merge path_to_log [out_prefix]')
         exit(-1)
 
-    path = sys.argv[1] + '*.log'
+    if not path.endswith('.log'):
+        path += '*.log'
 
-    print(path)
     log_files = sorted(glob(path))
+    print('processing...')
     print(log_files)
 
-    merge = LogMerge(log_files)
+    merge = LogMerge(log_files, out_path=prefix)
     merge.do()
 
 
