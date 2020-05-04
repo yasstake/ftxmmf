@@ -22,7 +22,7 @@ class FtxClient:
             on_error=self._on_error,
             on_open=self.on_open
         )
-        self.log = Logger(log_file_dir=log_dir, process_name='FTX')
+        self.log = Logger(log_file_dir=log_dir, process_name='FTX', flag_file_dir=log_dir)
         self.order_book = OrderBook()
         self.partial = False
 

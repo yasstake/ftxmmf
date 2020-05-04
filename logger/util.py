@@ -79,7 +79,7 @@ class Action:
 
 class Logger:
     '''logging file utility'''
-    def __init__(self, log_file_dir=None, flag_file_name=None, process_name=None):
+    def __init__(self, log_file_dir=None, flag_file_dir=None, process_name=None):
         self.log_file_root_name = None
         self.log_file_name = None
         self.last_action = None
@@ -97,8 +97,8 @@ class Logger:
         else:
             self.process_name = 'LOG'
 
-        if flag_file_name:
-            self.flag_file_name = flag_file_name
+        if flag_file_dir:
+            self.flag_file_name = flag_file_dir + os.sep + self.process_name
         else:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 

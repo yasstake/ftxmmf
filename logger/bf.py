@@ -26,7 +26,7 @@ class BfClient:
         )
 
         self.ws.on_open = self.on_open
-        self.log = Logger(log_file_dir=log_dir, process_name='BF')
+        self.log = Logger(log_file_dir=log_dir, process_name='BF', flag_file_dir=log_dir)
         self.current_time = None
         self.partial = False
 
