@@ -3,9 +3,10 @@ import sys, subprocess, glob
 from google.cloud import storage
 from logger.util import *
 
+
 def upload(file, root_name, bucket_name):
     staging_file = file + '.stage'
-    done_file    = file + '.done'
+    done_file = file + '.done'
 
     os.rename(file, staging_file)
 
@@ -24,12 +25,12 @@ def upload(file, root_name, bucket_name):
     source_file_name = staging_file
     destination_blob_name = year + '/' + month + '/' + day + '/' + f_org
 
-    storage_client = storage.Client('bitmmf')
-    bucket = storage_client.get_bucket(bucket_name)
-    blob = bucket.blob(destination_blob_name)
+    #storage_client = storage.Client('bitmmf')
+    #bucket = storage_client.get_bucket(bucket_name)
+    #blob = bucket.blob(destination_blob_name)
 
     try:
-        blob.upload_from_filename(source_file_name)
+        # blob.upload_from_filename(source_file_name)
         os.rename(staging_file, done_file)
     except:
         os.rename(staging_file, file)  # rename org file name when error
@@ -46,11 +47,11 @@ def recover_file(log_dir, prefix, suffix, time):
     '''
 
     file_list = glob.glob(log_dir + os.sep + prefix + '*.log.gz' + suffix)
+    now = unixtime_now()
 
     for file in file_list:
         stat = os.stat(file)
         if stat:
-            now = unixtime_now()
             print(file, stat.st_ctime, now)
             if stat.st_ctime + time < now:
                 org_file_name = file.replace(suffix, '')
@@ -82,15 +83,18 @@ if __name__ == "__main__":
             subprocess.run(['/bin/gzip', '-9', file])
         else:
             subprocess.run(['/usr/bin/gzip', '-9', file])
-        print('uploading,,,', file + '.gz')
-        #upload(file + '.gz')
+
+    file_list = glob.glob(log_dir + os.sep + file_prefix + '*.log.gz')
+    for file in file_list:
+        print('uploading,,,', file)
+        upload(file, file_prefix, file_prefix)
 
     file_list = glob.glob(log_dir + os.sep + file_prefix + '*.log.gz.done')
+    now = unixtime_now()
     for file in file_list:
         stat = os.stat(file)
         if stat:
-            now = unixtime_now()
-            print(file, stat.st_ctime, now)
+            # print(file, stat.st_ctime, now)
             if stat.st_ctime + 24 * 60 * 60 * 2 < now:  # 2 days old
                 os.remove(file)
                 print("delete", file)
