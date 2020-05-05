@@ -130,7 +130,6 @@ class Logger:
                 pid = file.readline()
                 if pid != self.process_id():
                     self.terminate_count = self.terminate_count - 1
-                    print('*', end='')
                     if self.terminate_count < 0:
                         return True
         return False
