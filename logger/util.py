@@ -1,7 +1,7 @@
 from datetime import datetime
 import os
 from binascii import crc32
-
+from random import random
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 NANO_SEC = 1_000_000.0
@@ -103,7 +103,7 @@ class Logger:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
         self.terminate_count = 300
-        self.pid = str(os.getpid())
+        self.pid = str(unixtime_now()) + '-' + str(random()*1000)
 
         self.rotate_file()
 
