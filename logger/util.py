@@ -102,7 +102,7 @@ class Logger:
         else:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
-        self.terminate_count = 300
+        self.terminate_count = 500
         self.pid = str(unixtime_now()) + '-' + str(random()*1000)
 
         self.rotate_file()
@@ -130,7 +130,7 @@ class Logger:
                 pid = file.readline()
                 if pid != self.process_id():
                     self.terminate_count = self.terminate_count - 1
-                    print(self.terminate_count)
+                    print('*', end='')
                     if self.terminate_count < 0:
                         return True
         return False
@@ -159,6 +159,7 @@ class Logger:
         if not self._enable:
             return
 
+        # todo: 1) recycle file handler, 2) use gzip compress on the fly.
         with open(self.log_file_name, "a") as file:
             file.write(message)
 
@@ -285,4 +286,23 @@ class BoardCompress:
 
         return s[:-1]
 
+from logger.table import LogTable
+
+
+class LogLoader:
+    def __init__(self):
+        pass
+
+    def open(self, file):
+        pass
+
+    def line_string(self, line: str):
+        items = LogTable.parse_line(line.split(','))
+        return line(items)
+
+    def line(self, items):
+        pass
+
+    def new_tick(self):
+        pass
 

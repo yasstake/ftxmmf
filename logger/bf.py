@@ -31,12 +31,12 @@ class BfClient:
         self.partial = False
 
     def on_open(self):
+        self.log.create_terminate_flag()
         self.ws.send(json.dumps(
             [{"method": "subscribe", "params": {"channel": CHANNEL_EXECUTION}},
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD_SNAPSHOT}},
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD}}
              ]))
-        self.log.create_terminate_flag()
 
     def _on_message(self, message):
         json_message = json.loads(message)
