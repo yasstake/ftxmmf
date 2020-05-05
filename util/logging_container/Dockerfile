@@ -19,6 +19,7 @@ RUN /usr/bin/python3.7 -m pip install tables
 RUN /usr/bin/python3.7 -m pip install gym
 RUN /usr/bin/python3.7 -m pip install --upgrade google-cloud-storage
 RUN /usr/bin/python3.7 -m pip install --upgrade tensorflow
+RUN /usr/bin/python3.7 -m pip install pandas
 
 RUN git clone https://github.com/yasstake/ftxmmf.git
 
