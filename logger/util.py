@@ -77,9 +77,6 @@ class Action:
     TRADE_SHORT_LIQUID = 7
 
 
-
-
-
 class Logger:
     '''logging file utility'''
     def __init__(self, log_file_dir=None, flag_file_dir=None, process_name=None):
@@ -105,7 +102,7 @@ class Logger:
         else:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
-        self.terminate_count = 200
+        self.terminate_count = 300
         self.pid = str(os.getpid())
 
         self.rotate_file()

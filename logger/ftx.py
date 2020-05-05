@@ -29,6 +29,7 @@ class FtxClient:
     def on_open(self):
         self.send_message('{"op": "subscribe", "channel": "trades", "market": "BTC-PERP"}')
         self.send_message('{"op": "subscribe", "channel": "orderbook", "market": "BTC-PERP"}')
+        self.log.create_terminate_flag()
 
     def send_message(self, message):
         self.ws.send(message)
@@ -90,7 +91,6 @@ class FtxClient:
             if not self.partial:
                 self.partial = True
                 self.log.set_enable()
-                self.log.create_terminate_flag()
 
             self.order_book.clear()
             self.log.write_action(Action.PARTIAL, time, None, None)

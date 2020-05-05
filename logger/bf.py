@@ -36,6 +36,7 @@ class BfClient:
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD_SNAPSHOT}},
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD}}
              ]))
+        self.log.create_terminate_flag()
 
     def _on_message(self, message):
         json_message = json.loads(message)
@@ -82,7 +83,7 @@ class BfClient:
             if not self.partial and self.current_time:
                 self.partial = True
                 self.log.set_enable()
-                self.log.create_terminate_flag()
+
             self.log.write_action(Action.PARTIAL, time, None, None)
 
         self._board_to_csv(bids, asks)
