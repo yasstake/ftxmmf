@@ -9,7 +9,7 @@ class MarketTestCase(unittest.TestCase):
     def test_create(self):
         m = Market()
 
-        m.load_csv('../../DATA/BF-TEST.log')
+        m.load_csv('../../DATA/MERGE.log.gz')
 
 
 if __name__ == '__main__':
