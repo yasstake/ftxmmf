@@ -149,7 +149,7 @@ if __name__ == '__main__':
         logfile = sys.argv[1]
         db_file = sys.argv[2]
     else:
-        print('[usage] table.py logfile.log [dbfile.hd5]')
+        print('[usage] table_test.py logfile.log [dbfile.hd5]')
         exit(-1)
 
     loader = LogTable()

@@ -22,7 +22,8 @@ RUN /usr/bin/python3.7 -m pip install --upgrade tensorflow
 
 RUN git clone https://github.com/yasstake/ftxmmf.git
 
-ADD net2log.sh /ftxmmf
+ADD ftx2log.sh /ftxmmf
+ADD bf2log.sh /ftxmmf
 
 CMD /usr/bin/python3.7
 

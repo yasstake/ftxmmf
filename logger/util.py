@@ -77,6 +77,9 @@ class Action:
     TRADE_SHORT_LIQUID = 7
 
 
+
+
+
 class Logger:
     '''logging file utility'''
     def __init__(self, log_file_dir=None, flag_file_dir=None, process_name=None):
@@ -284,4 +287,5 @@ class BoardCompress:
                     s += str(ask) + ',' + str(self.asks[ask]) + ','
 
         return s[:-1]
+
 
