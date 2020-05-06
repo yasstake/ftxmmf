@@ -22,6 +22,8 @@ RUN /usr/bin/python3.7 -m pip install --upgrade tensorflow
 RUN /usr/bin/python3.7 -m pip install pandas
 RUN /usr/bin/python3.7 -m pip install tqdm
 
+ADD BUILDDATE /tmp/
+
 RUN git clone https://github.com/yasstake/ftxmmf.git
 
 ADD ftx2log.sh /ftxmmf
