@@ -60,7 +60,7 @@ class FtxClient:
                 data = json_message['data']
                 self.trade_message_to_csv(data)
 
-        if self.partial and self.log.check_terminate_flag():
+        if self.log.check_terminate_flag():
             self.ws.close()
 
     def _on_close(self):
@@ -88,9 +88,8 @@ class FtxClient:
         action = json_message['action']
 
         if action == 'partial':
-            if not self.partial:
-                self.partial = True
-                self.log.set_enable()
+            self.partial = True
+            self.log.set_enable()
 
             self.order_book.clear()
             self.log.write_action(Action.PARTIAL, time, None, None)
