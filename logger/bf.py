@@ -80,8 +80,8 @@ class BfClient:
 
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
-            if not self.partial and self.current_time:
-                self.partial = True
+            self.partial = True
+            if self.current_time:
                 self.log.set_enable()
 
             self.log.write_action(Action.PARTIAL, time, None, None)

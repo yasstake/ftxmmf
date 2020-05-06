@@ -102,10 +102,10 @@ class Logger:
         else:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
-        self.terminate_count = 500
-        self.pid = self.process_name + str(unixtime_now()) + '-' + str(random()*1000)
-
         self.rotate_file()
+
+        self.terminate_count = 500
+        self.pid = self.log_file_name + '-' + str(unixtime_now()) + '-' + str(random()*1000)
 
     def close(self):
         self.rotate_file()
