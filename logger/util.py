@@ -117,10 +117,12 @@ class Logger:
     def create_terminate_flag(self):
         self.remove_terminate_flag()
         file_name = self.flag_file_name
-        with open(file_name + "tmp", "w") as file:
+        tmp_file_name = file_name + self.process_id()
+        with open(tmp_file_name, "w") as file:
             file.write(self.process_id())
             file.close()
-            os.rename(file_name + "tmp", file_name)
+        self.remove_terminate_flag()
+        os.rename(tmp_file_name, file_name)
 
         print('createflag', self.flag_file_name, ' ', self.process_id())
 
@@ -156,6 +158,7 @@ class Logger:
                                  + time_string + ".log"
 
         self.log_file_name = self.log_file_root_name + ".current"
+        print('[newfile]', self.log_file_name)
 
     def write(self, message):
         if not self._enable:
