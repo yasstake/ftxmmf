@@ -115,9 +115,9 @@ class Logger:
         return self.pid
 
     def create_terminate_flag(self):
-        self.remove_terminate_flag()
         file_name = self.flag_file_name
-        tmp_file_name = file_name + self.process_id()
+        tmp_file_name = file_name + '.' + str(unixtime_now())
+
         with open(tmp_file_name, "w") as file:
             file.write(self.process_id())
             file.close()
