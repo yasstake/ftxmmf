@@ -135,8 +135,10 @@ class Logger:
             if file != self.flag_file_name:
                 print('[peer flag ]', file)
                 terminate = True
-                self.remove_terminate_flag()
                 break
+
+        if terminate:
+            self.remove_terminate_flag()
 
         return terminate
 
@@ -144,8 +146,7 @@ class Logger:
         self._enable = True
 
     def remove_terminate_flag(self):
-        files = glob(self.flag_pattern)
-        for file in files:
+        for file in glob(self.flag_pattern):
             print('[remove flag]', file)
             os.remove(file)
 
