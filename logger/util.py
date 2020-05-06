@@ -103,7 +103,7 @@ class Logger:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
 
         self.terminate_count = 500
-        self.pid = str(unixtime_now()) + '-' + str(random()*1000)
+        self.pid = self.process_name + str(unixtime_now()) + '-' + str(random()*1000)
 
         self.rotate_file()
 
@@ -122,6 +122,8 @@ class Logger:
             file.close()
             os.rename(file_name + "tmp", file_name)
 
+        print('createflag', self.flag_file_name, ' ', self.process_id())
+
     def check_terminate_flag(self):
         file_name = self.flag_file_name
 
@@ -131,6 +133,7 @@ class Logger:
                 if pid != self.process_id():
                     self.terminate_count = self.terminate_count - 1
                     if self.terminate_count < 0:
+                        print(self.terminate_count)
                         return True
         return False
 
