@@ -4,6 +4,7 @@ from glob import glob
 import pathlib
 from binascii import crc32
 from random import random
+import gzip
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 NANO_SEC = 1_000_000.0
@@ -108,11 +109,11 @@ class Logger:
             self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name + self.process_id() + '.lock'
             self.flag_pattern = os.sep + "tmp" + os.sep + self.process_name + '*' + '.lock'
 
-        self.rotate_file()
-
+        self.log_file = None
+        self.open_log_file()
 
     def close(self):
-        self.rotate_file()
+        self.close_log_file()
         self.remove_terminate_flag()
 
     def process_id(self):
@@ -150,27 +151,32 @@ class Logger:
             print('[remove flag]', file)
             os.remove(file)
 
-    def rotate_file(self):
-        if self.log_file_name:
-            if os.path.isfile(self.log_file_name):
-                os.rename(self.log_file_name, self.log_file_root_name)
-
+    def open_log_file(self):
         time_string = unixtime_to_iso(unixtime_now()).replace(":", "-").replace('+', '-')
 
         self.log_file_root_name = self.log_file_dir + os.sep + self.process_name + '-' \
-                                 + time_string + ".log"
+                                 + time_string + ".log.gz"
 
         self.log_file_name = self.log_file_root_name + ".current"
         print('[newfile]', self.log_file_name)
+
+        self.log_file = gzip.open(self.log_file_name, 'wt', compresslevel=9)
+
+    def close_log_file(self):
+        if self.log_file:
+            self.log_file.close()
+            self.log_file = None
+
+        if os.path.isfile(self.log_file_name):
+            os.rename(self.log_file_name, self.log_file_root_name)
 
     def write(self, message):
         if not self._enable:
             print('[skipping] ', message)
             return
 
-        # todo: 1) recycle file handler, 2) use gzip compress on the fly.
-        with open(self.log_file_name, "a") as file:
-            file.write(message)
+        if self.log_file:
+            self.log_file.write(message)
 
     def write_check_sum(self, checksum):
         self.write(str(checksum))
