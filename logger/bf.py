@@ -14,7 +14,7 @@ _END_POINT = 'wss://ws.lightstream.bitflyer.com/json-rpc'
 CHANNEL_EXECUTION = 'lightning_executions_FX_BTC_JPY'
 CHANNEL_BOARD_SNAPSHOT = 'lightning_board_snapshot_FX_BTC_JPY'
 CHANNEL_BOARD = 'lightning_board_FX_BTC_JPY'
-
+TERMINATE_PERIOD = 3
 
 class BfClient:
     def __init__(self, log_dir=None):
@@ -29,10 +29,10 @@ class BfClient:
         self.log = Logger(log_file_dir=log_dir, process_name='BF', flag_file_dir=log_dir)
         self.current_time = None
         self.partial = False
+        self.terminate_count = 0
 
     def on_open(self):
         self.log.create_terminate_flag()
-
         self.ws.send(json.dumps(
             [{"method": "subscribe", "params": {"channel": CHANNEL_EXECUTION}},
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD_SNAPSHOT}},
@@ -52,7 +52,7 @@ class BfClient:
         else:
             print('other channel', channel)
 
-        if self.log.check_terminate_flag():
+        if TERMINATE_PERIOD < self.terminate_count:
             self.ws.close()
 
     def _get_url(self):
@@ -87,6 +87,12 @@ class BfClient:
 
             print('[PARTIAL]', self.current_time, self.log._enable)
             self.log.write_action(Action.PARTIAL, self.current_time, None, None)
+
+            if self.terminate_count:
+                self.terminate_count += 1
+            elif self.log.check_terminate_flag():
+                self.terminate_count = 1
+
 
         self._board_to_csv(bids, asks)
 

@@ -10,6 +10,7 @@ try:
 except ImportError:
     import _thread as thread
 
+TERMINATE_PERIOD = 500
 
 class FtxClient:
     _ENDPOINT = 'wss://ftx.com/ws/'
@@ -25,6 +26,7 @@ class FtxClient:
         self.log = Logger(log_file_dir=log_dir, process_name='FTX', flag_file_dir=log_dir)
         self.order_book = OrderBook()
         self.partial = False
+        self.terminate_count = 0
 
     def on_open(self):
         self.log.create_terminate_flag()
@@ -60,8 +62,12 @@ class FtxClient:
                 data = json_message['data']
                 self.trade_message_to_csv(data)
 
-        if self.log.check_terminate_flag():
-            self.ws.close()
+        if self.terminate_count:
+            self.terminate_count += 1
+            if TERMINATE_PERIOD < self.terminate_count:
+                self.ws.close()
+        elif self.log.check_terminate_flag():
+            self.terminate_count = 1
 
     def _on_close(self):
         self.log.close()
