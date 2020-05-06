@@ -76,7 +76,6 @@ class BfClient:
     def board_message_to_csv(self, json_message: json, channel):
         bids = json_message['bids']
         asks = json_message['asks']
-        time = str(self.current_time)
 
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
@@ -84,8 +83,8 @@ class BfClient:
             if self.current_time:
                 self.log.set_enable()
 
-            print('[PARTIAL]', time, self.log._enable)
-            self.log.write_action(Action.PARTIAL, time, None, None)
+            print('[PARTIAL]', self.current_time, self.log._enable)
+            self.log.write_action(Action.PARTIAL, self.current_time, None, None)
 
         self._board_to_csv(bids, asks)
 
@@ -125,7 +124,6 @@ class BfClient:
             print('ERROR')
 
         self.log.write_action(action, time, price, size, id)
-
 
 
 import sys

@@ -122,7 +122,7 @@ class Logger:
             file.write(self.process_id())
 
         self.remove_terminate_flag()
-        os.rename(tmp_file_name, file_name)
+        os.replace(tmp_file_name, file_name)
 
         print('createflag', self.flag_file_name, ' ', self.process_id())
 
