@@ -1,5 +1,7 @@
 from datetime import datetime
 import os
+from glob import glob
+import pathlib
 from binascii import crc32
 from random import random
 
@@ -97,15 +99,17 @@ class Logger:
         else:
             self.process_name = 'LOG'
 
+        self.pid = str(unixtime_now()) + '-' + str(random()*1000)
+
         if flag_file_dir:
-            self.flag_file_name = flag_file_dir + os.sep + self.process_name
+            self.flag_file_name = flag_file_dir + os.sep + self.process_name + self.process_id() + '.lock'
+            self.flag_pattern = flag_file_dir + os.sep + self.process_name + '*' + '.lock'
         else:
-            self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name
+            self.flag_file_name = os.sep + "tmp" + os.sep + self.process_name + self.process_id() + '.lock'
+            self.flag_pattern = os.sep + "tmp" + os.sep + self.process_name + '*' + '.lock'
 
         self.rotate_file()
 
-        self.terminate_count = 500
-        self.pid = self.log_file_name + '-' + str(unixtime_now()) + '-' + str(random()*1000)
 
     def close(self):
         self.rotate_file()
@@ -115,37 +119,35 @@ class Logger:
         return self.pid
 
     def create_terminate_flag(self):
-        file_name = self.flag_file_name
-        tmp_file_name = file_name + '.' + str(unixtime_now())
-
-        with open(tmp_file_name, "w") as file:
-            file.write(self.process_id())
-
         self.remove_terminate_flag()
-        os.replace(tmp_file_name, file_name)
-
-        print('createflag', self.flag_file_name, ' ', self.process_id())
+        pathlib.Path(self.flag_file_name).touch()
+        print('createflag', self.flag_file_name)
 
     def check_terminate_flag(self):
-        file_name = self.flag_file_name
+        '''
+        フラグパターンのファイルが 自分以外が存在　→　終了（削除）
+        　　　　　　　　　　　　　１つのみ、かつ自分　→　維持
+        :return:
+        '''
+        terminate = False
 
-        if os.path.isfile(file_name):
-            with open(file_name, "r") as file:
-                pid = file.readline()
-                if pid != self.process_id():
-                    self.terminate_count = self.terminate_count - 1
-                    if self.terminate_count < 0:
-                        print(self.terminate_count)
-                        return True
-        return False
+        for file in glob(self.flag_pattern):
+            if file != self.flag_file_name:
+                print('[peer flag ]', file)
+                terminate = True
+                self.remove_terminate_flag()
+                break
+
+        return terminate
 
     def set_enable(self):
         self._enable = True
 
     def remove_terminate_flag(self):
-        file_name = self.flag_file_name
-        if file_name and os.path.isfile(file_name):
-            os.remove(file_name)
+        files = glob(self.flag_pattern)
+        for file in files:
+            print('[remove flag]', file)
+            os.remove(file)
 
     def rotate_file(self):
         if self.log_file_name:
@@ -162,6 +164,7 @@ class Logger:
 
     def write(self, message):
         if not self._enable:
+            print('[skipping] ', message)
             return
 
         # todo: 1) recycle file handler, 2) use gzip compress on the fly.
