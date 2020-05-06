@@ -31,7 +31,6 @@ class BfClient:
         self.partial = False
 
     def on_open(self):
-        self.log.create_terminate_flag()
         self.ws.send(json.dumps(
             [{"method": "subscribe", "params": {"channel": CHANNEL_EXECUTION}},
              {"method": "subscribe", "params": {"channel": CHANNEL_BOARD_SNAPSHOT}},
@@ -79,7 +78,11 @@ class BfClient:
 
         m = ""
         if channel == CHANNEL_BOARD_SNAPSHOT:
-            self.partial = True
+            if not self.partial:
+                self.log.create_terminate_flag()
+            else:
+                self.partial = True
+
             if self.current_time:
                 self.log.set_enable()
 
