@@ -51,7 +51,7 @@ class BfClient:
         else:
             print('other channel', channel)
 
-        if self.partial and self.log.check_terminate_flag():
+        if self.log.check_terminate_flag():
             self.ws.close()
 
     def _get_url(self):
