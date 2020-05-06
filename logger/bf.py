@@ -84,6 +84,7 @@ class BfClient:
             if self.current_time:
                 self.log.set_enable()
 
+            print('[PARTIAL]', time, self.log._enable)
             self.log.write_action(Action.PARTIAL, time, None, None)
 
         self._board_to_csv(bids, asks)

@@ -94,6 +94,7 @@ class FtxClient:
 
             self.order_book.clear()
             self.log.write_action(Action.PARTIAL, time, None, None)
+            print('[PARTIAL]', time, self.log._enable)
 
         self._board_to_csv(bids, asks, time, checksum)
 

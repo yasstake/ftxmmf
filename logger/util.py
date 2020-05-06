@@ -120,7 +120,7 @@ class Logger:
 
         with open(tmp_file_name, "w") as file:
             file.write(self.process_id())
-            file.close()
+
         self.remove_terminate_flag()
         os.rename(tmp_file_name, file_name)
 
@@ -144,7 +144,7 @@ class Logger:
 
     def remove_terminate_flag(self):
         file_name = self.flag_file_name
-        if os.path.isfile(file_name):
+        if file_name and os.path.isfile(file_name):
             os.remove(file_name)
 
     def rotate_file(self):
