@@ -9,8 +9,7 @@ result=$?
 
 if [ ${result} = 0 ]; then
     echo "sleep 30 sec"
-    sleep 30
-    #sleep 3000
+    sleep 3000
 fi
 
 
