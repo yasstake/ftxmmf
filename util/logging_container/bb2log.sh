@@ -2,7 +2,7 @@
 
 export PYTHONPATH=/ftxmmf/
 
-/usr/bin/python3.7 -m logger.bf /bitlog
+/usr/bin/python3.7 -m logger.bybit /bitlog
 result=$?
 
 # /usr/bin/python3.7 -m logger.upload /bitlog BF
