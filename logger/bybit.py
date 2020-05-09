@@ -132,11 +132,11 @@ class BybitClient:
             self.single_trade_message(execute)
 
     def single_trade_message(self, message):
-        self.current_time = message['trade_time_ms']
+        self.current_time = int(message['trade_time_ms']) * 1_000
         side = message['side']
         price = float(message['price'])
         size = float(message['size'])
-        trade_id = str(message['trade_id'])
+        # trade_id = str(message['trade_id'])
 
         action = 0
         if side == 'Sell':
@@ -146,7 +146,7 @@ class BybitClient:
         else:
             print('ERROR')
 
-        self.log.write_action(action, self.current_time, price, size, trade_id)
+        self.log.write_action(action, self.current_time, price, size)
 
 
 if __name__ == '__main__':
