@@ -3,7 +3,8 @@ import atexit
 import websocket
 from websocket import WebSocketApp
 from logger.util import *
-import csv
+import zlib
+
 
 try:
     import thread
@@ -12,8 +13,20 @@ except ImportError:
 
 TERMINATE_PERIOD = 500
 
-class FtxClient:
-    _ENDPOINT = 'wss://ftx.com/ws/'
+_ENDPOINT = 'wss://real.OKEx.com:8443/ws/v3'
+
+
+def inflate(data):
+    decompress = zlib.decompressobj(-zlib.MAX_WBITS)
+    inflated = decompress.decompress(data)
+    inflated += decompress.flush()
+    return inflated
+
+
+class OkExClient:
+    """
+    https://www.okex.com/docs/en/#spot_ws-channel
+    """
 
     def __init__(self, log_dir=None):
         self.ws = WebSocketApp(
@@ -23,44 +36,54 @@ class FtxClient:
             on_error=self._on_error,
             on_open=self.on_open
         )
-        self.log = Logger(log_file_dir=log_dir, process_name='FTX', flag_file_dir=log_dir)
+        self.log = Logger(log_file_dir=log_dir, process_name='OK', flag_file_dir=log_dir)
         self.order_book = OrderBook()
         self.partial = False
         self.terminate_count = 0
 
     def on_open(self):
         self.log.create_terminate_flag()
-        self.send_message('{"op": "subscribe", "channel": "trades", "market": "BTC-PERP"}')
-        self.send_message('{"op": "subscribe", "channel": "orderbook", "market": "BTC-PERP"}')
+        self.send_message('{"op": "subscribe", "args": ["spot/trade:BTC-USDT", "spot/depth:BTC-USDT"]}')
 
     def send_message(self, message):
         self.ws.send(message)
 
     def _get_url(self):
-        return FtxClient._ENDPOINT
+        return _ENDPOINT
 
-    def _on_message(self, raw_message: str):
-        json_message = json.loads(raw_message)
+    def _on_message(self, raw_message):
+        message = inflate(raw_message)
+        # print(message)
+        json_message = json.loads(message)
 
-        channel = json_message['channel']
-        type = json_message['type']
+        if 'event' in json_message:
+            print('EVENT', message)
+        elif 'table' in json_message:
+            type = json_message['table']
 
-        if type == 'subscribed':
-            print('subscribed', raw_message)
-        else:
-            if channel == 'orderbook':
+            if type == 'spot/depth':
+                action = json_message['action']
                 data = json_message['data']
-                checksum = self.board_message_to_csv(data)
-                crc = self.order_book.ftx_crc32()
 
-                if crc != checksum and self.partial:
-                    print('ERROR: checksum error')
-                    self.ws.close()
+                for item in data:
+                    checksum = self.board_message_to_csv(item, action)
 
-                # self.log.write(csv)
-            elif channel == 'trades':
+                    ''' 
+                    TODO: implement crc for okex
+                    crc = self.order_book.okex_crc32()
+                    
+
+                    print('[checksum]', checksum, crc)
+                    if crc != checksum and self.partial:
+                        print('ERROR: checksum error', crc, checksum)
+                        #self.ws.close()
+                    '''
+
+            elif type == 'spot/trade':
                 data = json_message['data']
                 self.trade_message_to_csv(data)
+        else:
+            print('ERROR unknown message', message)
 
         if self.terminate_count:
             self.terminate_count += 1
@@ -80,18 +103,12 @@ class FtxClient:
     def connect(self):
         self.ws.run_forever(ping_interval=70, ping_timeout=30)
 
-    def _board_message_to_csv(self, message: str):
-        message = message.replace("'", '"')
-        json_message = json.loads(message)
-        self.board_message_to_csv(json_message)
-
-    def board_message_to_csv(self, json_message: json):
+    def board_message_to_csv(self, json_message: json, action):
         bids = json_message['bids']
         asks = json_message['asks']
-        time = json_message['time']
-        time = to_nsec(time)
+        time = json_message['timestamp']
+        time = isotime_to_unix(time, ns=True)
         checksum = json_message['checksum']
-        action = json_message['action']
 
         if action == 'partial':
             self.partial = True
@@ -99,7 +116,7 @@ class FtxClient:
 
             self.order_book.clear()
             self.log.write_action(Action.PARTIAL, time, None, None)
-            print('[PARTIAL]', time, self.log._enable)
+            # print('[PARTIAL]', time, self.log._enable)
 
         self._board_to_csv(bids, asks, time, checksum)
 
@@ -136,12 +153,11 @@ class FtxClient:
             self.single_trade_message(execute)
 
     def single_trade_message(self, message):
-        time = message['time']
+        time = message['timestamp']
         side = message['side']
-        price = message['price']
-        size = message['size']
-        liquidation = message['liquidation']
-        id = message['id']
+        price = float(message['price'])
+        size = float(message['size'])
+        id = message['trade_id']
 
         action = 0
         if side == 'sell':
@@ -150,9 +166,6 @@ class FtxClient:
             action = Action.TRADE_LONG
         else:
             print('ERROR')
-
-        if liquidation == 1:
-            action += 1
 
         unix_time = isotime_to_unix(time, True)
         self.log.write_action(action, unix_time, price, size, id)
@@ -165,7 +178,7 @@ if __name__ == '__main__':
         log_dir = sys.argv[1]
 
     websocket.enableTrace(True)
-    client = FtxClient(log_dir)
+    client = OkExClient(log_dir)
     atexit.register(client._on_close)
     client.connect()
 

@@ -5,6 +5,8 @@ import pathlib
 from binascii import crc32
 from random import random
 import gzip
+import zlib
+
 
 ISO_FORMAT_LEN = len('2020-04-30T11:43:53.734593')
 NANO_SEC = 1_000_000.0
@@ -196,7 +198,7 @@ class Logger:
         s = '\n' + str(action) + ',' + str(time) + ',' + str(self.last_index) + ','
         if price is not None:
             if price_in_100c:
-                s += str(int(price*10))
+                s += str(int(float(price)*10))
             else:
                 s += str(price)
         s += ','
@@ -229,7 +231,7 @@ class OrderBook:
         else:
             self.asks[price] = size
 
-    def to_string(self):
+    def to_ftx_string(self):
         sorted_bids = sorted(self.bids.keys(), reverse=True)
         sorted_asks = sorted(self.asks.keys())
 
@@ -248,10 +250,94 @@ class OrderBook:
 
         return s
 
-    def crc32(self):
-        s = self.to_string()
+
+    def ftx_crc32(self):
+        s = self.to_ftx_string()
         return crc32(s.encode())
 
+
+
+
+    def to_okex_string(self):
+        sorted_bids = sorted(self.bids.keys(), reverse=True)
+        sorted_asks = sorted(self.asks.keys())
+
+        ask_len = len(sorted_asks)
+        bit_len = len(sorted_bids)
+        num_items = min(max(ask_len, bit_len), 25)
+
+        s = ''
+        for i in range(num_items):
+            if i < bit_len:
+                bid = sorted_bids[i]
+                s += str(bid) + ':' + str(self.bids[bid]) + ':'
+            if i < ask_len:
+                ask = sorted_asks[i]
+                s += str(ask) + ':' + str(self.asks[ask]) + ':'
+
+        if s.endswith(':'):
+            s = s[:-1]
+
+        return s
+
+    def okex_crc32(self):
+        # 获取bid档str
+        bids = self.bids
+        asks = self.asks
+
+        bids_l = []
+        bid_l = []
+        count_bid = 1
+        while count_bid <= 25:
+            if count_bid > len(bids):
+                break
+            bids_l.append(bids[count_bid - 1])
+            count_bid += 1
+        for j in bids_l:
+            str_bid = ':'.join(j[0: 2])
+            bid_l.append(str_bid)
+        # 获取ask档str
+        asks_l = []
+        ask_l = []
+        count_ask = 1
+        while count_ask <= 25:
+            if count_ask > len(asks):
+                break
+            asks_l.append(asks[count_ask - 1])
+            count_ask += 1
+        for k in asks_l:
+            str_ask = ':'.join(k[0: 2])
+            ask_l.append(str_ask)
+        # 拼接str
+        num = ''
+        if len(bid_l) == len(ask_l):
+            for m in range(len(bid_l)):
+                num += bid_l[m] + ':' + ask_l[m] + ':'
+        elif len(bid_l) > len(ask_l):
+            # bid档比ask档多
+            for n in range(len(ask_l)):
+                num += bid_l[n] + ':' + ask_l[n] + ':'
+            for l in range(len(ask_l), len(bid_l)):
+                num += bid_l[l] + ':'
+        elif len(bid_l) < len(ask_l):
+            # ask档比bid档多
+            for n in range(len(bid_l)):
+                num += bid_l[n] + ':' + ask_l[n] + ':'
+            for l in range(len(bid_l), len(ask_l)):
+                num += ask_l[l] + ':'
+
+        new_num = num[:-1]
+        int_checksum = zlib.crc32(new_num.encode())
+        fina = self.change(int_checksum)
+        return fina
+
+    def change(num_old):
+        num = pow(2, 31) - 1
+        if num_old > num:
+            out = num_old - num * 2 - 2
+        else:
+            out = num_old
+        return out
 
 class BoardCompress:
     def __init__(self):
@@ -303,23 +389,4 @@ class BoardCompress:
 
         return s[:-1]
 
-from logger.table import LogTable
-
-
-class LogLoader:
-    def __init__(self):
-        pass
-
-    def open(self, file):
-        pass
-
-    def line_string(self, line: str):
-        items = LogTable.parse_line(line.split(','))
-        return line(items)
-
-    def line(self, items):
-        pass
-
-    def new_tick(self):
-        pass
 
