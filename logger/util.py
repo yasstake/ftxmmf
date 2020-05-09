@@ -177,6 +177,8 @@ class Logger:
 
         if self.log_file:
             self.log_file.write(message)
+        else:
+            print('[ERROR] file is not open')
 
     def write_check_sum(self, checksum):
         self.write(str(checksum))

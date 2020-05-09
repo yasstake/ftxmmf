@@ -3,6 +3,7 @@ import websocket
 from websocket import WebSocketApp
 from logger.util import *
 import atexit
+import sys
 
 try:
     import thread
@@ -11,6 +12,9 @@ except ImportError:
 
 
 _END_POINT = 'wss://stream.bybit.com/realtime_public'
+CHANNEL_ORDER_BOOK = 'orderBook_200.100ms.BTCUSDT'
+CHANNEL_TRADE = 'trade.BTCUSDT'
+CHANNEL_INSTRUMENT = 'instrument_info.100ms.BTCUSDT'
 TERMINATE_PERIOD = 3
 
 
@@ -24,7 +28,7 @@ class BybitClient:
         )
 
         self.ws.on_open = self.on_open
-        self.log = Logger(log_file_dir=log_dir, process_name='BF', flag_file_dir=log_dir)
+        self.log = Logger(log_file_dir=log_dir, process_name='BB', flag_file_dir=log_dir)
         self.current_time = None
         self.partial = False
         self.terminate_count = 0
@@ -32,29 +36,45 @@ class BybitClient:
     def on_open(self):
         self.log.create_terminate_flag()
 
-        self.ws.send('{"op": "subscribe", "args": ["orderBook_200.100ms.BTCUSDT"]}')
-        self.ws.send('{"op": "subscribe", "args": ["trade.BTCUSDT"]}')
+        self.ws.send('{"op": "subscribe", "args": ["' + CHANNEL_ORDER_BOOK + '"]}')
+        self.ws.send('{"op": "subscribe", "args": ["' + CHANNEL_TRADE + '"]}')
+        self.ws.send('{"op": "subscribe", "args": ["' + CHANNEL_INSTRUMENT + '"]}')
 
     def _on_message(self, message):
-        print(message)
+        json_message = json.loads(message)
 
-        # j = json.loads(m)
-
-        '''
-        channel = json_message['params']['channel']
-        message = json_message['params']['message']
-        '''
-        '''
-        if channel == CHANNEL_EXECUTION:
-            self.trade_message_to_csv(message)
-        elif channel == CHANNEL_BOARD_SNAPSHOT or channel == CHANNEL_BOARD:
-            self.board_message_to_csv(message, channel)
+        if 'topic' in json_message:
+            self.on_topic(json_message)
+        elif 'success' in json_message:
+            print('success', json_message)
         else:
-            print('other channel', channel)
+            print('unknown type', json_message)
 
-        if TERMINATE_PERIOD < self.terminate_count:
-            self.ws.close()
-        '''
+    def on_topic(self, json_message:json):
+        channel = json_message['topic']
+        data = json_message['data']
+        if 'timestamp_e6' in json_message:
+            time_stamp = json_message['timestamp_e6']
+            self.current_time = time_stamp
+
+        if channel == CHANNEL_ORDER_BOOK:
+            message_type = json_message['type'] # 'delta' or 'snapshot'
+            self.board_message_to_csv(data, message_type)
+            pass
+        elif channel == CHANNEL_TRADE:
+            self.trade_message_to_csv(data)
+            pass
+        elif channel == CHANNEL_INSTRUMENT:
+            pass
+        else:
+            print('Unknown channel')
+
+        if self.terminate_count:
+            self.terminate_count += 1
+            if TERMINATE_PERIOD < self.terminate_count:
+                self.ws.close()
+        elif self.log.check_terminate_flag():
+            self.terminate_count = 1
 
     def _get_url(self):
         return _END_POINT
@@ -75,40 +95,32 @@ class BybitClient:
         json_message = json.loads(message)
         self.board_message_to_csv(json_message, channel)
 
-    def board_message_to_csv(self, json_message: json, channel):
-        '''
-        bids = json_message['bids']
-        asks = json_message['asks']
-
-        m = ""
-        if channel == CHANNEL_BOARD_SNAPSHOT:
+    def board_message_to_csv(self, json_data: json, message_type: str):
+        if message_type == 'snapshot':
+            print('snapshot-----')
             self.partial = True
-
-            if self.current_time:
-                self.log.set_enable()
-
-            print('[PARTIAL]', self.current_time, self.log._enable)
+            self.log.set_enable()
             self.log.write_action(Action.PARTIAL, self.current_time, None, None)
 
-            if self.terminate_count:
-                self.terminate_count += 1
-            elif self.log.check_terminate_flag():
-                self.terminate_count = 1
+        for key in json_data.keys():
+            self._process_board_message(key, json_data[key])
 
+    def _process_board_message(self, key, line):
+        for rec in line:
+            side = rec['side']
+            if side == 'Sell':
+                action = Action.UPDATE_BIT
+            elif side == 'Buy':
+                action = Action.UPDATE_ASK
+            else:
+                print('error unknown side')
 
-        self._board_to_csv(bids, asks)
-        '''
-
-    def _board_to_csv(self, bids, asks):
-        '''
-        for board in bids:
-            price, size = board['price'], board['size']
-            self.log.write_action(Action.UPDATE_BIT, self.current_time, price, size)
-
-        for board in asks:
-            price, size = board['price'], board['size']
-            self.log.write_action(Action.UPDATE_ASK, self.current_time, price, size)
-        '''
+            price = float(rec['price'])
+            if key == 'delete':
+                size = 0
+            else:
+                size = rec['size']
+            self.log.write_action(action, self.current_time, price, size)
 
     def _trade_message_to_csv(self, message):
         message = message.replace("'", '"')
@@ -120,26 +132,22 @@ class BybitClient:
             self.single_trade_message(execute)
 
     def single_trade_message(self, message):
-        time = message['exec_date']
-        time = isotime_to_unix(time, ns=True)
-        self.current_time = time
+        self.current_time = message['trade_time_ms']
         side = message['side']
-        price = message['price']
-        size = message['size']
-        id = message['id']
+        price = float(message['price'])
+        size = float(message['size'])
+        trade_id = str(message['trade_id'])
 
         action = 0
-        if side == 'SELL':
+        if side == 'Sell':
             action = Action.TRADE_SHORT
-        elif side == 'BUY':
+        elif side == 'Buy':
             action = Action.TRADE_LONG
         else:
             print('ERROR')
 
-        self.log.write_action(action, time, price, size, id)
+        self.log.write_action(action, self.current_time, price, size, trade_id)
 
-
-import sys
 
 if __name__ == '__main__':
     log_dir = None
