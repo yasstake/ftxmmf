@@ -15,7 +15,7 @@ _END_POINT = 'wss://stream.bybit.com/realtime_public'
 CHANNEL_ORDER_BOOK = 'orderBook_200.100ms.BTCUSDT'
 CHANNEL_TRADE = 'trade.BTCUSDT'
 CHANNEL_INSTRUMENT = 'instrument_info.100ms.BTCUSDT'
-TERMINATE_PERIOD = 3
+TERMINATE_PERIOD = 500
 
 
 class BybitClient:
@@ -88,7 +88,7 @@ class BybitClient:
         print('error', error)
 
     def connect(self):
-        self.ws.run_forever()
+        self.ws.run_forever(ping_interval=70, ping_timeout=30)
 
     def _board_message_to_csv(self, message: str, channel):
         message = message.replace("'", '"')
