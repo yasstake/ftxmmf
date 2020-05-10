@@ -14,6 +14,8 @@ except ImportError:
 TERMINATE_PERIOD = 500
 
 _ENDPOINT = 'wss://real.OKEx.com:8443/ws/v3'
+TRADE_CHANNEL = 'swap/trade:BTC-USD-SWAP'
+BOARD_CHANNEL = 'swap/depth:BTC-USDT-SWAP'
 
 
 def inflate(data):
@@ -25,7 +27,12 @@ def inflate(data):
 
 class OkExClient:
     """
+    References,,
+    OKEX API Docummentation
     https://www.okex.com/docs/en/#spot_ws-channel
+
+    Websocket example implementation(See enum definitions)
+    https://github.com/okex/V3-Open-API-SDK/blob/master/okex-python-sdk-api/websocket_example.py
     """
 
     def __init__(self, log_dir=None):
@@ -43,7 +50,7 @@ class OkExClient:
 
     def on_open(self):
         self.log.create_terminate_flag()
-        self.send_message('{"op": "subscribe", "args": ["spot/trade:BTC-USDT", "spot/depth:BTC-USDT"]}')
+        self.send_message('{"op": "subscribe", "args": ["' + TRADE_CHANNEL + '", "' + BOARD_CHANNEL + '"]}')
 
     def send_message(self, message):
         self.ws.send(message)
@@ -61,7 +68,7 @@ class OkExClient:
         elif 'table' in json_message:
             type = json_message['table']
 
-            if type == 'spot/depth':
+            if type == 'swap/depth':
                 action = json_message['action']
                 data = json_message['data']
 
@@ -79,9 +86,11 @@ class OkExClient:
                         #self.ws.close()
                     '''
 
-            elif type == 'spot/trade':
+            elif type == 'swap/trade':
                 data = json_message['data']
                 self.trade_message_to_csv(data)
+            else:
+                print('ERROR unknown message type', type)
         else:
             print('ERROR unknown message', message)
 
@@ -127,13 +136,13 @@ class OkExClient:
             bid_price = board[0]
             bid_size = board[1]
             self.order_book.set_bids(bid_price, bid_size)
-            self.log.write_action(Action.UPDATE_BIT, time, bid_price, bid_size)
+            self.log.write_action(Action.UPDATE_BIT, time, bid_price, bid_size, price_in_100c=True)
 
         for board in asks:
             ask_price = board[0]
             ask_size = board[1]
             self.order_book.set_asks(ask_price, ask_size)
-            self.log.write_action(Action.UPDATE_ASK, time, ask_price, ask_size)
+            self.log.write_action(Action.UPDATE_ASK, time, ask_price, ask_size, price_in_100c=True)
 
         if len(bids) or len(asks):
             self.log.write_check_sum(checksum)
@@ -168,7 +177,7 @@ class OkExClient:
             print('ERROR')
 
         unix_time = isotime_to_unix(time, True)
-        self.log.write_action(action, unix_time, price, size, id)
+        self.log.write_action(action, unix_time, price, size, id, price_in_100c=True)
 
 import sys
 

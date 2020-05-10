@@ -24,7 +24,7 @@ class HuobiClient:
         )
 
         self.ws.on_open = self.on_open
-        self.log = Logger(log_file_dir=log_dir, process_name='BF', flag_file_dir=log_dir)
+        self.log = Logger(log_file_dir=log_dir, process_name='HU', flag_file_dir=log_dir)
         self.current_time = None
         self.partial = False
         self.terminate_count = 0
