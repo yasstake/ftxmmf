@@ -70,6 +70,7 @@ def unixtime_now(ns=False):
 
 class Action:
     # board
+    # action, time, sequence, price, volume, checksum
     PARTIAL = 1
     UPDATE_BIT = 2
     UPDATE_ASK = 3
@@ -80,6 +81,16 @@ class Action:
 
     TRADE_SHORT = 6
     TRADE_SHORT_LIQUID = 7
+
+    # Open Interest
+    # action, time, 0,, volume,
+    OPEN_INTEREST = 10
+
+    # funding rate
+    # action, time(next funding), 0, rate,, checksum
+    FUNDING_RATE = 11
+
+
 
 
 class Logger:

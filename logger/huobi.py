@@ -9,7 +9,7 @@ try:
 except ImportError:
     import _thread as thread
 
-
+# wss://api-aws.huobi.pro/ws
 _END_POINT = 'wss://api-cloud.huobi.co.jp/ws'
 TERMINATE_PERIOD = 3
 
