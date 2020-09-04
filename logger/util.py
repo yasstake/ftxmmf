@@ -95,13 +95,14 @@ class Action:
 
 class Logger:
     '''logging file utility'''
-    def __init__(self, log_file_dir=None, flag_file_dir=None, process_name=None):
+    def __init__(self, log_file_dir=None, flag_file_dir=None, process_name=None, compress=True):
         self.log_file_root_name = None
         self.log_file_name = None
         self.last_action = None
         self.last_time = None
         self.last_index = None
         self._enable = False
+        self.compress = compress
 
         if log_file_dir:
             self.log_file_dir = log_file_dir
@@ -168,12 +169,18 @@ class Logger:
         time_string = unixtime_to_iso(unixtime_now()).replace(":", "-").replace('+', '-')
 
         self.log_file_root_name = self.log_file_dir + os.sep + self.process_name + '-' \
-                                 + time_string + ".log.gz"
+                                 + time_string + ".log"
+
+        if self.compress:
+            self.log_file_root_name += '.gz'
 
         self.log_file_name = self.log_file_root_name + ".current"
         print('[newfile]', self.log_file_name)
 
-        self.log_file = gzip.open(self.log_file_name, 'wt', compresslevel=9)
+        if self.compress:
+            self.log_file = gzip.open(self.log_file_name, 'wt', compresslevel=9)
+        else:
+            self.log_file = open(self.log_file_name, 'wt')
 
     def close_log_file(self):
         if self.log_file:
@@ -261,13 +268,9 @@ class OrderBook:
 
         return s
 
-
     def ftx_crc32(self):
         s = self.to_ftx_string()
         return crc32(s.encode())
-
-
-
 
     def to_okex_string(self):
         sorted_bids = sorted(self.bids.keys(), reverse=True)
@@ -350,6 +353,7 @@ class OrderBook:
             out = num_old
         return out
 
+
 class BoardCompress:
     def __init__(self):
         self.bids = None
@@ -399,5 +403,4 @@ class BoardCompress:
                     s += str(ask) + ',' + str(self.asks[ask]) + ','
 
         return s[:-1]
-
 
