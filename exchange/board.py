@@ -12,12 +12,12 @@ PARTIAL_TIME = 600  # sec
 
 
 def timestamp(time) -> pd.Timestamp:
-    """
+    '''
     >>> timestamp(1) == pd.Timestamp('1970-01-01 00:00:01')
     True
     >>> timestamp(pd.Timestamp('1970-01-01 00:00:02')) == pd.Timestamp('1970-01-01 00:00:02')
     True
-    """
+    '''
     if time is None:
         return time
 
@@ -25,7 +25,6 @@ def timestamp(time) -> pd.Timestamp:
         return pd.Timestamp(ts_input=time*1000_000_000)
     else:
         return time
-
 
 
 def board_df_to_list(df, reverse=False):
@@ -36,11 +35,13 @@ def board_df_to_list(df, reverse=False):
     :return:
     '''
     df = df[[PRICE, SIZE]].sort_values(PRICE, ascending=reverse)
-
     return df.values.tolist()
 
-def execute_df_toarray(df):
-    pass
+
+def execute_df_to_list(df, reverse=False):
+    df = df[[PRICE, SIZE]].sort_values(PRICE, ascending=reverse)
+    return df.values.tolist()
+
 
 def _chop_log_data(df, *, start=None, end=None):
     '''
@@ -64,18 +65,32 @@ def _chop_log_data(df, *, start=None, end=None):
     return df
 
 
+def execute_price(data, volume):
+    '''
+    calc price to consume volume
+    :param data: [price, volume] list
+    :param volume: volume to consume
+    :return: the edge price
+    '''
+    v = 0
+    for d in data:
+        v += d[1]
+        if volume < v:
+            return d[0]
+    return None
 
 class History:
     def __init__(self):
         '''
         >>> history = History()
+        >>> history is not None
+        True
         '''
         self.log_data = None
         self.start_time = None
         self.end_time = None
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
-
 
     def chop_max_time_width(self):
         '''
@@ -96,7 +111,7 @@ class History:
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
-        bit_board = board_df_to_list(bit)
+        bit_board = board_df_to_list(bit, False)
         ask_board = board_df_to_list(ask, True)
 
         return bit_board, ask_board
@@ -112,7 +127,7 @@ class History:
         bit = bit.drop_duplicates(subset=PRICE, keep='last')
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
 
-        return bit, ask
+        return bit[bit[SIZE] != 0], ask[ask[SIZE] != 0]
 
     def _select_board_df(self, time):
         time = timestamp(time)
@@ -140,203 +155,32 @@ class History:
         long_df = df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
         short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
 
-        long_df = long_df[[PRICE, SIZE]].groupby([PRICE]).sum()
-        short_df = short_df[[PRICE, SIZE]].groupby([PRICE]).sum()
+        long_df = long_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()
+        short_df = short_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()
 
         return long_df, short_df
-        #return long_df[[TIME, PRICE, SIZE]], short_df[[TIME, PRICE, SIZE]]
 
-    def get_open_interest(self, time, window):
-        """
+    def select_execute(self, start, end):
+        long_df, short_df = self._select_execute_df(start, end)
+        long_list = execute_df_to_list(long_df, False)
+        short_list = execute_df_to_list(short_df, True)
 
-        :param time:
-        :param window:
-        :return: long, short
-        """
+        return long_list, short_list
 
-    def board_price(self, time):
+    def board_price(self, time, volume=0):
         """
         :param time: unix_time(UTC) to select
         :return: board price(ask_price, ask_size, bit_price, bit_size)
         """
-        df = self._get_board_df(time)
+        bit, ask = self.get_board(time)
 
+        return execute_price(bit, volume), execute_price(ask, volume)
 
-        # bit_price, bit_size, ask_price, ask_size
+    def market_price(self, time, volume=0, window=10):
+        window = pd.Timedelta(seconds=window)
+        long, short = self.select_execute(time, time+window)
 
-    def is_success_short_order(self, time, price, size, time_window=60):
-        pass
-
-    def is_success_long_order(self, time, price, size, time_window=60):
-        pass
-
-    def calc_price(self, time, price, volume, action, limit, time_window=60):
-        """
-        calc execute price
-        :param time:
-        :param price:
-        :param volume:
-        :param action:
-        :param limit:
-        :param time_window:
-        :return:
-        """
-
-    def calc_price_short_limit(self):
-        pass
-
-    def calc_price_short_market(self):
-        pass
-
-    def calc_price_long_limit(self):
-        pass
-
-    def calc_price_long_market(self):
-        """
-        calc market buy price
-        The price will be the top edge of the order book if there is enough volume on the board.
-        if there is not enough volume, the price will be slip two tick.
-        :return: the target price. return None: if not found the data.
-        """
-        rec = self.select_order_book_price_with_retry(time)
-        if rec is None:
-            return None
-
-
-
-
-
-
-'''
-        sell_min, sell_volume, buy_max, buy_volume = rec
-
-        if order_volume * 1.5 < sell_volume:  # 1.5 means enough margin
-            return sell_min
-        else:
-            return sell_min + PRICE_UNIT
-
-
-
-
-
-def calc_market_order_sell(self, time, order_volume):
-    """
-    calc market buy price
-    basically the price will be the bottom edge of the order book if there is enough volume on the board.
-    if there is not enough volume, the price will be slip two tick.
-    :return: the target price. return None: if not found the data.
-    """
-    rec = self.select_order_book_price_with_retry(time)
-    if rec is None:
-        return None
-
-    sell_min, sell_volume, buy_max, buy_volume = rec
-
-    if order_volume * 1.5 < buy_volume:  # 2 means enough margin
-        return buy_max
-    else:
-        return buy_max - PRICE_UNIT
-
-
-def is_suceess_fixed_order_sell(self, time, price, volume, time_width=ORDER_TIME_WIDTH):
-    sell_min, sell_volume, buy_max, buy_volume = self.select_order_book_price_with_retry(time)
-
-    sql_count_sell_trade = 'select sum(volume) from buy_trade where  ? <= time and time < ? and ? <= price'
-
-    end_time = time + time_width
-    self.cursor.execute(sql_count_sell_trade, (time, end_time, price))
-
-    amount = self.cursor.fetchone()
-
-    if amount[0] is None:
-        return False
-
-    if volume + sell_volume < amount[0]:
-        return price, end_time
-    else:
-        return False
-
-
-def _calc_order_book_price_sell(self, time):
-    rec = self.select_order_book_price_with_retry(time)
-    if rec is None:
-        return None
-
-    sell_min, sell_volume, buy_max, buy_volume = rec
-    return sell_min
-
-
-MIN_ORDER_TIME = 60
-
-
-def calc_fixed_order_sell(self, time, volume, time_width=ORDER_TIME_WIDTH):
-    """
-    :param time: unix time at the order
-    :param price: order price
-    :param volume: order volume
-    :param time_width: wait to order (sec)
-    :return: (price, time) to be executed nor None if not executed
-    """
-    price = self._calc_order_book_price_sell(time)
-
-    window = LogDb.MIN_ORDER_TIME
-
-    result = None
-    while window <= time_width:
-        result = self.is_suceess_fixed_order_sell(time, price, volume, window)
-        if result:
-            break
-        window += LogDb.MIN_ORDER_TIME
-
-    return result
-
-
-def is_suceess_fixed_order_buy(self, time, price, volume, time_width=ORDER_TIME_WIDTH):
-    sell_min, sell_volume, buy_max, buy_volume = self.select_order_book_price_with_retry(time)
-    sql_count_sell_trade = 'select sum(volume) from sell_trade where  ? <= time and time < ? and price <= ?'
-
-    end_time = time + time_width
-    self.cursor.execute(sql_count_sell_trade, (time, end_time, price))
-    amount = self.cursor.fetchone()
-
-    if amount[0] is None:
-        return None
-
-    if volume + buy_volume < amount[0]:
-        return price, end_time
-    else:
-        return None
-
-
-def _calc_order_book_price_buy(self, time):
-    rec = self.select_order_book_price_with_retry(time)
-    if rec is None:
-        return None
-
-    sell_min, sell_volume, buy_max, buy_volume = rec
-    return buy_max
-
-
-def calc_fixed_order_buy(self, time, volume, time_width=ORDER_TIME_WIDTH):
-    """
-    :param time: time in unix time
-    :param volume: order volume
-    :param time_width: time to execute
-    :return: (price, time) to be executed nor None if not executed.
-    """
-    price = self._calc_order_book_price_buy(time)
-    window = LogDb.MIN_ORDER_TIME
-
-    result = None
-
-    while window <= time_width:
-        result = self.is_suceess_fixed_order_buy(time, price, volume, window)
-        if result:
-            break
-        window += LogDb.MIN_ORDER_TIME
-
-    return result
-'''
+        return execute_price(long, volume), execute_price(short, volume)
 
 
 def load_file(file) -> History:
@@ -344,9 +188,6 @@ def load_file(file) -> History:
     create History object, load log file and return it!!
     :param file: path to file
     :return history object
-
-    >>> history = load_file('../DATA/BF-TEST.log')
-    >>> print(history.end_time)
     '''
     names = (ACTION, TIME, INDEX, PRICE, SIZE, CHECKSUM)
     df = pd.read_csv(file, names=names)

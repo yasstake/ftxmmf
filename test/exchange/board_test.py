@@ -47,6 +47,11 @@ class MyTestCase(unittest.TestCase):
         print(long)
         print(short)
 
+    def test_select_execute(self):
+        history = load_file('./testdata.csv')
+        long, short = history.select_execute(1, 4)
+        print(long)
+        print(short)
 
 
     def test_select_data_frame(self):
@@ -63,6 +68,49 @@ class MyTestCase(unittest.TestCase):
 
         last_index = history._get_last_partial_index(history._chop_log_data(history.log_data, start=0, end=1))
         print(last_index)
+
+    def test_get_board_price(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        bit, ask = history.board_price(history.end_time - pd.Timedelta(seconds=60))
+        print(bit, ask)
+
+    def test_market_price(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        buy, sell = history.market_price(history.end_time - pd.Timedelta(seconds=60))
+        print(buy, sell)
+
+    def test_execute_price(self):
+        data = [[10, 1], [11, 2], [12, 3]]
+        price = execute_price(data, 0)
+        self.assertEqual(price, 10)
+
+        price = execute_price(data, 0.9)
+        self.assertEqual(price, 10)
+
+        price = execute_price(data, 1)
+        self.assertEqual(price, 11)
+
+        price = execute_price(data, 1.5)
+        self.assertEqual(price, 11)
+
+        price = execute_price(data, 3)
+        self.assertEqual(price, 12)
+
+        data = [[12, 3], [11, 2], [10, 1]]
+        price = execute_price(data, 0)
+        self.assertEqual(price, 12)
+
+        price = execute_price(data, 2.9)
+        self.assertEqual(price, 12)
+
+        price = execute_price(data, 3)
+        self.assertEqual(price, 11)
+
+        price = execute_price(data, 4.9)
+        self.assertEqual(price, 11)
+
+        price = execute_price(data, 5)
+        self.assertEqual(price, 10)
 
 
 if __name__ == '__main__':
