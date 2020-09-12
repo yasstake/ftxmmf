@@ -11,64 +11,140 @@ CHECKSUM = 'checksum'
 PARTIAL_TIME = 600  # sec
 
 
-'''
+def timestamp(time) -> pd.Timestamp:
+    """
+    >>> timestamp(1) == pd.Timestamp('1970-01-01 00:00:01')
+    True
+    >>> timestamp(pd.Timestamp('1970-01-01 00:00:02')) == pd.Timestamp('1970-01-01 00:00:02')
+    True
+    """
+    if time is None:
+        return time
+
+    if type(time) is int:
+        return pd.Timestamp(ts_input=time*1000_000_000)
+    else:
+        return time
 
 
-'''
+
+def board_df_to_list(df, reverse=False):
+    '''
+    make [(price, volume),,,,] array
+    :param df:
+    :param reverse:
+    :return:
+    '''
+    df = df[[PRICE, SIZE]].sort_values(PRICE, ascending=reverse)
+
+    return df.values.tolist()
+
+def execute_df_toarray(df):
+    pass
+
+def _chop_log_data(df, *, start=None, end=None):
+    '''
+    chop log data as specified time frame
+    :param df: pandas dataframe
+    :param start: start time in EPOC us
+    :param end: end time in EPOC us
+    :return: new chopped data frame
+    '''
+    start = timestamp(start)
+    end = timestamp(end)
+
+    if (start is None) or (start <= timestamp(0)):
+        df = df[df[TIME] <= end]
+    elif end is None:
+        df = df[start < df[TIME]]
+    if start and end:
+        df = df[(start < df[TIME]) & (df[TIME] <= end)]
+    else:
+        print('ERROR param　error chop_log_data')
+    return df
+
+
 
 class History:
     def __init__(self):
+        '''
+        >>> history = History()
+        '''
         self.log_data = None
         self.start_time = None
         self.end_time = None
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
 
-    def _chop_log_data(self, df, *, start=None, end=None):
-        if start and end:
-            df = df[(start < df[TIME] & df[TIME] < end)]
-        elif start is None:
-            df = df[df[TIME] < end]
-        elif end is None:
-            df = df[start < df[TIME]]
-        else:
-            print('ERROR param　error chop_log_data')
-
-        return df
 
     def chop_max_time_width(self):
+        '''
+
+        :return:
+        '''
         one_day_before = self.end_time - self.board_time_width
-        self.log_data = self._chop_log_data(self.log_data, start=one_day_before)
+        self.log_data = _chop_log_data(self.log_data, start=one_day_before)
         self.update_log_time_frame()
 
     def update_log_time_frame(self):
+        '''
+        initialize start_time and end_time accroding to the trade log.
+        '''
         df = self.log_data
         self.start_time = df.head(1).iat[0, 1]
         self.end_time = df.tail(1).iat[0, 1]
 
-    def load_file(self, file):
-        names = (ACTION, TIME, INDEX, PRICE, SIZE, CHECKSUM)
-        df = pd.read_csv(file, names=names)
-        df[TIME] = pd.to_datetime(df[TIME] * 1000)
-        self.log_data = df
-        self.update_log_time_frame()
-
     def get_board(self, time):
+        bit, ask = self._get_board_df(time)
+        bit_board = board_df_to_list(bit)
+        ask_board = board_df_to_list(ask, True)
+
+        return bit_board, ask_board
+
+    def _get_board_df(self, time):
         """
         :param time:
         :return: asks, bits
         """
+        df = self._select_board_df(time)
+        bit = df[df[ACTION] == Action.UPDATE_BIT]
+        ask = df[df[ACTION] == Action.UPDATE_ASK]
+        bit = bit.drop_duplicates(subset=PRICE, keep='last')
+        ask = ask.drop_duplicates(subset=PRICE, keep='last')
+
+        return bit, ask
+
+    def _select_board_df(self, time):
+        time = timestamp(time)
         start_time = time - self.board_time_width
-        df = self._chop_log_data(self.log_data, start=start_time, end=time)
-        partial = df[(df[ACTION] == Action.PARTIAL)]
-        last_partial = partial.drop_duplicates(subset=ACTION, keep='last')
-        partial_index = last_partial.index[0]
+        df = _chop_log_data(self.log_data, start=start_time, end=time)
+        partial_index = self._get_last_partial_index(df)
         df = df.iloc[partial_index:]
 
+        return df
 
+    def _get_last_partial_index(self, df):
+        """
+        find and return last partial index
+        :param df: data frame to search
+        :return: partial index no of df
+        """
+        partial = df[df[ACTION] == Action.PARTIAL]
+        last_partial = partial.drop_duplicates(subset=ACTION, keep='last')
+        partial_index = last_partial.index[0]
 
+        return partial_index
 
+    def _select_execute_df(self, start, end):
+        df = _chop_log_data(self.log_data, start=start, end=end)
+        long_df = df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
+        short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
 
+        long_df = long_df[[PRICE, SIZE]].groupby([PRICE]).sum()
+        short_df = short_df[[PRICE, SIZE]].groupby([PRICE]).sum()
+
+        return long_df, short_df
+        #return long_df[[TIME, PRICE, SIZE]], short_df[[TIME, PRICE, SIZE]]
 
     def get_open_interest(self, time, window):
         """
@@ -81,8 +157,11 @@ class History:
     def board_price(self, time):
         """
         :param time: unix_time(UTC) to select
-        :return: 5 record of board price(ask_price, ask_size, bit_price, bit_size)x5 times
+        :return: board price(ask_price, ask_size, bit_price, bit_size)
         """
+        df = self._get_board_df(time)
+
+
         # bit_price, bit_size, ask_price, ask_size
 
     def is_success_short_order(self, time, price, size, time_window=60):
@@ -105,10 +184,13 @@ class History:
 
     def calc_price_short_limit(self):
         pass
+
     def calc_price_short_market(self):
         pass
+
     def calc_price_long_limit(self):
         pass
+
     def calc_price_long_market(self):
         """
         calc market buy price
@@ -119,6 +201,10 @@ class History:
         rec = self.select_order_book_price_with_retry(time)
         if rec is None:
             return None
+
+
+
+
 
 
 '''
@@ -251,3 +337,27 @@ def calc_fixed_order_buy(self, time, volume, time_width=ORDER_TIME_WIDTH):
 
     return result
 '''
+
+
+def load_file(file) -> History:
+    '''
+    create History object, load log file and return it!!
+    :param file: path to file
+    :return history object
+
+    >>> history = load_file('../DATA/BF-TEST.log')
+    >>> print(history.end_time)
+    '''
+    names = (ACTION, TIME, INDEX, PRICE, SIZE, CHECKSUM)
+    df = pd.read_csv(file, names=names)
+    df[TIME] = pd.to_datetime(df[TIME] * 1000)
+    history = History()
+    history.log_data = df
+    history.update_log_time_frame()
+
+    return history
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
