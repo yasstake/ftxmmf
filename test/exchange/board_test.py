@@ -19,17 +19,17 @@ class MyTestCase(unittest.TestCase):
         board = history._select_board_df(4)
         print(board)
 
-    def test_get_board(self):
-        history = load_file('./testdata.csv')
+    def test_get_board3(self):
+        history = load_file('../../DATA/BF-TEST.log')
         print(history.start_time)
         print(history.end_time)
 
-        bit, ask = history._get_board_df(3)
+        bit, ask = history.get_board(history.end_time)
         print(bit)
         print()
         print(ask)
-        print('---')
-        bit, ask = history.get_board(3)
+
+        bit, ask = history.board_price(history.end_time)
         print(bit)
         print()
         print(ask)
@@ -52,6 +52,13 @@ class MyTestCase(unittest.TestCase):
         long, short = history.select_execute(1, 4)
         print(long)
         print(short)
+
+    def test_select_execute(self):
+        history = load_file('./testdata.csv')
+        long, short = history.select_execute(1, 4)
+        print(long)
+        print(short)
+
 
 
     def test_select_data_frame(self):
