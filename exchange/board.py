@@ -1,5 +1,6 @@
 import pandas as pd
 from logger.util import Action
+import matplotlib as plt
 
 TIME = 'time'
 INDEX = 'index'
@@ -150,10 +151,18 @@ class History:
 
         return partial_index
 
+    def _filter_long(self, df):
+        long_df = df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
+        return long_df
+
+    def _filter_short(self, df):
+        short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
+        return short_df
+
     def _select_execute_df(self, start, end):
         df = _chop_log_data(self.log_data, start=start, end=end)
-        long_df = df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
-        short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
+        long_df = self._filter_long(df)
+        short_df = self._filter_short(df)
 
         long_df = long_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()
         short_df = short_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()

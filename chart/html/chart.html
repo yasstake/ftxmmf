@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <script src="js/chart.js"></script>
+</head>
+<body>
+<script>
+const chart = LightweightCharts.createChart(document.body, { width: window.innerWidth - 10, height: window.innerHeight-10});
+const shortSeries = chart.addLineSeries({color: 'rgba(4, 111, 232, 1)'});
+const longSeries = chart.addLineSeries({color: 'rgba(100, 4, 232, 1)'});
+
+
+$.getJSON('./long.json', (data) => {
+    longSeries.setData(data);
+});
+
+$.getJSON('./short.json', (data) => {
+    shortSeries.setData(data);
+});
+
+
+
+</script>
+</body>
+</html>

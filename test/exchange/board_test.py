@@ -1,5 +1,6 @@
 import unittest
 from exchange.board import *
+import matplotlib.pyplot as plt
 
 
 class MyTestCase(unittest.TestCase):
@@ -60,7 +61,6 @@ class MyTestCase(unittest.TestCase):
         print(short)
 
 
-
     def test_select_data_frame(self):
         history = load_file('./testdata.csv')
         history._select_board_df(1)
@@ -119,6 +119,80 @@ class MyTestCase(unittest.TestCase):
         price = execute_price(data, 5)
         self.assertEqual(price, 10)
 
+    def test_info(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        df = history._filter_short(history.log_data)
+        print(df.describe())
+
+        df = history._filter_long(history.log_data)
+        print(df.describe())
+
+    def test_plot1(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        short_df = history._filter_short(history.log_data)
+        long_df = history._filter_long(history.log_data)
+
+        plt.scatter(long_df[TIME], long_df[PRICE])
+        plt.scatter(short_df[TIME], short_df[PRICE])
+
+        plt.show()
+
+    def test_plot2(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        long_df = history._filter_long(history.log_data)
+        short_df = history._filter_short(history.log_data)
+
+        plt.hist(long_df[PRICE])
+        plt.hist(short_df[PRICE])
+        plt.show()
+
+
+
+
+    def test_loop_df(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        df = history.log_data
+
+        for loc, rec in df.iterrows():
+            print(loc)
+
+    def test_export_to_json(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        long_df = history._filter_long(history.log_data)
+        short_df = history._filter_short(history.log_data)
+
+        self.write_json(long_df, '../../chart/html/long.json')
+        self.write_json(short_df, '../../chart/html/short.json')
+
+    def write_json(self, df, file):
+        df = df[[TIME, PRICE]]
+        df = df.rename(columns={SIZE: 'value'})
+
+        with open(file, mode='w') as f:
+            f.write('[')
+
+            last_time = 0
+            not_first = False
+            for r in df.itertuples(name=None):
+                time = int(r[1].value / 1000_000_000)
+                if last_time == time:
+                    continue
+
+                last_time = time
+                if not_first:
+                    f.write(',')
+                f.write('{"time":')
+                f.write(str(time))
+                f.write(',')
+                f.write('"value":')
+                f.write(str(int(r[2]/10)))
+                f.write('}')
+                not_first = True
+            f.write(']')
+
+
+
+#        long_df.to_json('long.json', orient='records')
 
 if __name__ == '__main__':
     unittest.main()
