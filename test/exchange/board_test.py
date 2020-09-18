@@ -164,9 +164,63 @@ class MyTestCase(unittest.TestCase):
         self.write_json(long_df, '../../chart/html/long.json')
         self.write_json(short_df, '../../chart/html/short.json')
 
+    def test_print_rows(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        df = history._filter_execute(history.log_data)
+        for index, row in df.iterrows():
+            print(row)
+
+
+    def test_export_execute(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        df = history._filter_execute(history.log_data)
+
+        VOL = 20
+        tick = 0
+        last_tick = 0
+        size = 0
+        doll = 0
+        f = open('../../chart/html/dollbar.json', mode='w')
+        f.write('[')
+        t = 0
+
+        o = h = l = c = None
+
+        for index, row in df.iterrows():
+            if row.action == Action.TRADE_LONG or row.action == Action.TRADE_SHORT_LIQUID \
+                    or row.action == Action.TRADE_SHORT or row.action == Action.TRADE_SHORT_LIQUID:
+
+                price = row.price
+                if not o:
+                    o = price
+                if h is None or h < price:
+                    h = price
+                if l is None or price < l:
+                    l = price
+
+                size += row[VOLUME]
+                doll += row[VOLUME]
+
+                tick = int(doll / VOL)
+                if last_tick != tick:
+                    last_tick = tick
+                    c = price
+                    t = t + 1
+                    line = ',{' + '"time": {0}, "open": {1}, "close": {2}, "high": {3}, "low": {4}' \
+                              .format(t, o, c, h, l) + '}'
+                    f.write(line)
+                    o = c = h = l = None
+        f.write(']')
+        f.close()
+
+
+
+
+
+
     def write_json(self, df, file):
         df = df[[TIME, PRICE]]
-        df = df.rename(columns={SIZE: 'value'})
+        df = df.rename(columns={VOLUME: 'value'})
 
         with open(file, mode='w') as f:
             f.write('[')
@@ -190,6 +244,12 @@ class MyTestCase(unittest.TestCase):
                 not_first = True
             f.write(']')
 
+    def test_doll_bar(self):
+
+        for r in df.itertuples(name=None):
+            time = int(r[1].value / 1000_000_000)
+            if last_time == time:
+                continue
 
 
 #        long_df.to_json('long.json', orient='records')

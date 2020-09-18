@@ -6,7 +6,7 @@ TIME = 'time'
 INDEX = 'index'
 ACTION = 'action'
 PRICE = 'price'
-SIZE = 'size'
+VOLUME = 'volume'
 CHECKSUM = 'checksum'
 
 PARTIAL_TIME = 600  # sec
@@ -35,12 +35,12 @@ def board_df_to_list(df, reverse=False):
     :param reverse:
     :return:
     '''
-    df = df[[PRICE, SIZE]].sort_values(PRICE, ascending=reverse)
+    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=reverse)
     return df.values.tolist()
 
 
 def execute_df_to_list(df, reverse=False):
-    df = df[[PRICE, SIZE]].sort_values(PRICE, ascending=reverse)
+    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=reverse)
     return df.values.tolist()
 
 
@@ -128,7 +128,7 @@ class History:
         bit = bit.drop_duplicates(subset=PRICE, keep='last')
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
 
-        return bit[bit[SIZE] != 0], ask[ask[SIZE] != 0]
+        return bit[bit[VOLUME] != 0], ask[ask[VOLUME] != 0]
 
     def _select_board_df(self, time):
         time = timestamp(time)
@@ -159,13 +159,18 @@ class History:
         short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
         return short_df
 
+    def _filter_execute(self, df):
+        df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID,
+                                         Action.TRADE_LONG, Action.TRADE_SHORT_LIQUID])]
+        return df
+
     def _select_execute_df(self, start, end):
         df = _chop_log_data(self.log_data, start=start, end=end)
         long_df = self._filter_long(df)
         short_df = self._filter_short(df)
 
-        long_df = long_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()
-        short_df = short_df[[PRICE, SIZE]].groupby([PRICE], as_index=False).sum()
+        long_df = long_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
+        short_df = short_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
 
         return long_df, short_df
 
@@ -183,7 +188,20 @@ class History:
         """
         bit, ask = self.get_board(time)
 
-        return execute_price(bit, volume), execute_price(ask, volume)
+        bit_price = bit[0][0]
+        bit_volume = bit[0][1]
+        ask_price = ask[0][0]
+        ask_volume = ask[0][0]
+
+        bit_execute_price, ask_execute_price = execute_price(bit, volume+bit_volume), execute_price(ask, volume+ask_volume)
+
+        if bit_price < bit_execute_price:
+            bit_price = None
+
+        if ask_execute_price < ask_price:
+            ask_price = None
+
+        return bit_price, ask_price
 
     def market_price(self, time, volume=0, window=10):
         window = pd.Timedelta(seconds=window)
@@ -191,14 +209,13 @@ class History:
 
         return execute_price(long, volume), execute_price(short, volume)
 
-
 def load_file(file) -> History:
     '''
     create History object, load log file and return it!!
     :param file: path to file
     :return history object
     '''
-    names = (ACTION, TIME, INDEX, PRICE, SIZE, CHECKSUM)
+    names = (ACTION, TIME, INDEX, PRICE, VOLUME, CHECKSUM)
     df = pd.read_csv(file, names=names)
     df[TIME] = pd.to_datetime(df[TIME] * 1000)
     history = History()
