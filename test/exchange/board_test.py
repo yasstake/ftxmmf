@@ -170,7 +170,6 @@ class MyTestCase(unittest.TestCase):
         for index, row in df.iterrows():
             print(row)
 
-
     def test_export_execute(self):
         history = load_file('../../DATA/MERGE.log.gz')
         df = history._filter_execute(history.log_data)
@@ -180,15 +179,17 @@ class MyTestCase(unittest.TestCase):
         last_tick = 0
         size = 0
         doll = 0
-        f = open('../../chart/html/dollbar.json', mode='w')
-        f.write('[')
         t = 0
-
         o = h = l = c = None
-
+        list_t = []
+        list_o = []
+        list_h = []
+        list_l = []
+        list_c = []
+        d_df = pd.DataFrame()
         for index, row in df.iterrows():
-            if row.action == Action.TRADE_LONG or row.action == Action.TRADE_SHORT_LIQUID \
-                    or row.action == Action.TRADE_SHORT or row.action == Action.TRADE_SHORT_LIQUID:
+            if row.action in [Action.TRADE_LONG,Action.TRADE_SHORT_LIQUID,
+                               Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]:
 
                 price = row.price
                 if not o:
@@ -206,13 +207,19 @@ class MyTestCase(unittest.TestCase):
                     last_tick = tick
                     c = price
                     t = t + 1
-                    line = ',{' + '"time": {0}, "open": {1}, "close": {2}, "high": {3}, "low": {4}' \
-                              .format(t, o, c, h, l) + '}'
-                    f.write(line)
+                    list_t += [t]
+                    list_o += [o]
+                    list_c += [c]
+                    list_h += [h]
+                    list_l += [l]
                     o = c = h = l = None
-        f.write(']')
-        f.close()
 
+        d_df = pd.DataFrame({'time': list_t, 'open': list_o, 'close': list_c,
+                             'high': list_h, 'low': list_l},
+                            columns=['time', 'open', 'close', 'high', 'low'])
+        print(d_df)
+
+        d_df.to_json('d.json', orient='records')
 
 
 
