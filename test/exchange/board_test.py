@@ -1,6 +1,7 @@
 import unittest
 from exchange.board import *
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class MyTestCase(unittest.TestCase):
@@ -169,6 +170,24 @@ class MyTestCase(unittest.TestCase):
         df = history._filter_execute(history.log_data)
         for index, row in df.iterrows():
             print(row)
+
+    def test_doll_bar2(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        df = history._filter_execute(history.log_data).copy()
+
+        TICK = 5
+
+        max = df[VOLUME].sum()
+        start = int(max + TICK) - max
+
+        ticks = np.arange(start, max, TICK)
+        df['sum'] = df[VOLUME].cumsum()
+        print(df.tail())
+        bins = pd.cut(df['sum'], ticks)
+        print(bins)
+
+        history = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min']}, axis=1)
+        print(history)
 
     def test_export_execute(self):
         history = load_file('../../DATA/MERGE.log.gz')

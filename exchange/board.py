@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from logger.util import Action
 import matplotlib as plt
 
@@ -208,6 +209,18 @@ class History:
         long, short = self.select_execute(time, time+window)
 
         return execute_price(long, volume), execute_price(short, volume)
+
+    def dollar_bar(self, tick_vol=5):
+        df = self._filter_execute(self.log_data).copy()
+        max_vol = df[VOLUME].sum()
+        start = int(max_vol + tick_vol) - max_vol
+
+        ticks = np.arange(start, max_vol, tick_vol)
+        df['sum'] = df[VOLUME].cumsum()
+        bins = pd.cut(df['sum'], ticks)
+        df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min']}, axis=1)
+
+        return df
 
 def load_file(file) -> History:
     '''
