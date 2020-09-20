@@ -14,12 +14,12 @@ PARTIAL_TIME = 600  # sec
 
 
 def timestamp(time) -> pd.Timestamp:
-    '''
+    """
     >>> timestamp(1) == pd.Timestamp('1970-01-01 00:00:01')
     True
     >>> timestamp(pd.Timestamp('1970-01-01 00:00:02')) == pd.Timestamp('1970-01-01 00:00:02')
     True
-    '''
+    """
     if time is None:
         return time
 
@@ -30,12 +30,12 @@ def timestamp(time) -> pd.Timestamp:
 
 
 def board_df_to_list(df, reverse=False):
-    '''
+    """
     make [(price, volume),,,,] array
     :param df:
     :param reverse:
     :return:
-    '''
+    """
     df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=reverse)
     return df.values.tolist()
 
@@ -46,13 +46,13 @@ def execute_df_to_list(df, reverse=False):
 
 
 def _chop_log_data(df, *, start=None, end=None):
-    '''
+    """
     chop log data as specified time frame
     :param df: pandas dataframe
     :param start: start time in EPOC us
     :param end: end time in EPOC us
     :return: new chopped data frame
-    '''
+    """
     start = timestamp(start)
     end = timestamp(end)
 
@@ -68,12 +68,12 @@ def _chop_log_data(df, *, start=None, end=None):
 
 
 def execute_price(data, volume):
-    '''
+    """
     calc price to consume volume
     :param data: [price, volume] list
     :param volume: volume to consume
     :return: the edge price
-    '''
+    """
     v = 0
     for d in data:
         v += d[1]
@@ -81,13 +81,14 @@ def execute_price(data, volume):
             return d[0]
     return None
 
+
 class History:
     def __init__(self):
-        '''
+        """
         >>> history = History()
         >>> history is not None
         True
-        '''
+        """
         self.log_data = None
         self.start_time = None
         self.end_time = None
@@ -95,18 +96,18 @@ class History:
         self.board_time_width = pd.Timedelta('1 d')
 
     def chop_max_time_width(self):
-        '''
+        """
 
         :return:
-        '''
+        """
         one_day_before = self.end_time - self.board_time_width
         self.log_data = _chop_log_data(self.log_data, start=one_day_before)
         self.update_log_time_frame()
 
     def update_log_time_frame(self):
-        '''
+        """
         initialize start_time and end_time accroding to the trade log.
-        '''
+        """
         df = self.log_data
         self.start_time = df.head(1).iat[0, 1]
         self.end_time = df.tail(1).iat[0, 1]
@@ -219,8 +220,14 @@ class History:
         df['sum'] = df[VOLUME].cumsum()
         bins = pd.cut(df['sum'], ticks)
         df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min']}, axis=1)
+        df.columns = ['time_stamp', 'open', 'close', 'high', 'low']
+        df = df.reset_index(drop=True)
+        df.index.name = 'time'
+        df = df[['time_stamp', 'open', 'close', 'high', 'low']]
+        print(df)
 
         return df
+
 
 def load_file(file) -> History:
     '''
