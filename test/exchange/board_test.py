@@ -171,6 +171,18 @@ class MyTestCase(unittest.TestCase):
         for index, row in df.iterrows():
             print(row)
 
+    def test_dollar_bar1(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+
+        df = history.dollar_bar(tick_vol=10)
+
+        plt.hist(df['close'])
+        plt.show()
+
+        plt.scatter(df.index, df['close'])
+        plt.show()
+
+
     def test_doll_bar2(self):
         history = load_file('../../DATA/MERGE.log.gz')
         df = history._filter_execute(history.log_data).copy()

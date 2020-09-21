@@ -4,14 +4,13 @@ from logger.util import Action
 import matplotlib as plt
 
 TIME = 'time'
-INDEX = 'index'
+SEQ = 'sequence'
 ACTION = 'action'
 PRICE = 'price'
 VOLUME = 'volume'
 CHECKSUM = 'checksum'
 
 PARTIAL_TIME = 600  # sec
-
 
 def timestamp(time) -> pd.Timestamp:
     """
@@ -221,12 +220,19 @@ class History:
         bins = pd.cut(df['sum'], ticks)
         df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min']}, axis=1)
         df.columns = ['time_stamp', 'open', 'close', 'high', 'low']
-        df = df.reset_index(drop=True)
+        df.reset_index(drop=True, inplace=True)
         df.index.name = 'time'
         df = df[['time_stamp', 'open', 'close', 'high', 'low']]
-        print(df)
 
         return df
+
+    '''
+    def open_interest(self, time, time_window=60):
+        long_df = self._filter_long(self.log_data)
+        short_df = self._filter_short(self.log_data)
+
+        open_long = long_df
+    '''
 
 
 def load_file(file) -> History:
@@ -235,7 +241,7 @@ def load_file(file) -> History:
     :param file: path to file
     :return history object
     '''
-    names = (ACTION, TIME, INDEX, PRICE, VOLUME, CHECKSUM)
+    names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
     df = pd.read_csv(file, names=names)
     df[TIME] = pd.to_datetime(df[TIME] * 1000)
     history = History()
