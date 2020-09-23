@@ -93,6 +93,7 @@ class History:
         self.end_time = None
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
+        self.dollar_bar = None
 
     def chop_max_time_width(self):
         """
@@ -182,7 +183,7 @@ class History:
 
         return long_list, short_list
 
-    def board_price(self, time, volume=0):
+    def market_price(self, time, volume=0):
         """
         :param time: unix_time(UTC) to select
         :return: board price(ask_price, ask_size, bit_price, bit_size)
@@ -192,25 +193,44 @@ class History:
         bit_price = bit[0][0]
         bit_volume = bit[0][1]
         ask_price = ask[0][0]
-        ask_volume = ask[0][0]
+        ask_volume = ask[0][1]
 
-        bit_execute_price, ask_execute_price = execute_price(bit, volume+bit_volume), execute_price(ask, volume+ask_volume)
-
+        bit_execute_price = execute_price(ask, volume+bit_volume)
         if bit_price < bit_execute_price:
+            bit_price = bit_execute_price
+
+        ask_execute_price = execute_price(bit, volume+ask_volume)
+        if ask_execute_price < ask_price:
+            ask_price = ask_execute_price
+
+        return bit_price, ask_price
+
+    def limit_price(self, time, volume=0, window=10):
+        bit, ask = self.get_board(time)
+
+        bit_price = bit[0][0]
+        bit_volume = bit[0][1]
+        ask_price = ask[0][0]
+        ask_volume = ask[0][1]
+
+        # todo: bit_volume and ask_volume must be setup by separately
+        bit_execute_price, ask_execute_price = self.calc_limit_price(time, volume+bit_volume+ask_volume, window)
+
+        if (ask_execute_price is None) or (bit_price < ask_execute_price):
             bit_price = None
 
-        if ask_execute_price < ask_price:
+        if (bit_execute_price is None) or (bit_execute_price < ask_price):
             ask_price = None
 
         return bit_price, ask_price
 
-    def market_price(self, time, volume=0, window=10):
+    def calc_limit_price(self, time, volume=0, window=10):
         window = pd.Timedelta(seconds=window)
         long, short = self.select_execute(time, time+window)
 
         return execute_price(long, volume), execute_price(short, volume)
 
-    def dollar_bar(self, tick_vol=5):
+    def setup_dollar_bar(self, tick_vol=5):
         df = self._filter_execute(self.log_data).copy()
         max_vol = df[VOLUME].sum()
         start = int(max_vol + tick_vol) - max_vol
@@ -223,8 +243,17 @@ class History:
         df.reset_index(drop=True, inplace=True)
         df.index.name = 'time'
         df = df[['time_stamp', 'open', 'close', 'high', 'low']]
+        self.dollar_bar = df
 
         return df
+
+    def setup_execute_price(self):
+        for index, row in self.dollar_bar.iterrows():
+            bit_price, ask_price = self.market_price(row.time)
+            long_price, short_price = self.limit_price(row.time)
+
+            self.dollar_bar[index]
+
 
     '''
     def open_interest(self, time, time_window=60):

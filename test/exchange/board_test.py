@@ -26,15 +26,49 @@ class MyTestCase(unittest.TestCase):
         print(history.start_time)
         print(history.end_time)
 
-        bit, ask = history.get_board(history.end_time)
-        print(bit)
+        bit, ask = history.get_board(history.start_time)
+        print(bit[0][0])
+        print(ask[0][0])
         print()
+
+        bit, ask = history.market_price(history.start_time)
+        print(bit)
         print(ask)
 
-        bit, ask = history.board_price(history.end_time)
-        print(bit)
+    def test_limited_price(self):
+        history = load_file('../../DATA/BF-TEST.log')
+        print(history.start_time)
+        print(history.end_time)
+
+        bit, ask = history.get_board(history.start_time)
+        print(bit[0][0])
+        print(ask[0][0])
         print()
+
+        bit, ask = history.limit_price(history.start_time, window=10*60*60)
+        print(bit)
         print(ask)
+
+        print('--- short window---')
+        bit, ask = history.limit_price(history.start_time, window=0.1)
+        print(bit)
+        print(ask)
+
+        print('--- short window---')
+        bit, ask = history.limit_price(history.start_time, window=0.8)
+        print(bit)
+        print(ask)
+
+        print('--- short window---')
+        bit, ask = history.limit_price(history.start_time, window=10)
+        print(bit)
+        print(ask)
+
+        print('--- short window---')
+        bit, ask = history.limit_price(history.start_time, window=100)
+        print(bit)
+        print(ask)
+
 
     def test_board_to_array(self):
         history = load_file('./testdata.csv')
@@ -79,12 +113,12 @@ class MyTestCase(unittest.TestCase):
 
     def test_get_board_price(self):
         history = load_file('../../DATA/MERGE.log.gz')
-        bit, ask = history.board_price(history.end_time - pd.Timedelta(seconds=60))
+        bit, ask = history.market_price(history.end_time - pd.Timedelta(seconds=60))
         print(bit, ask)
 
     def test_market_price(self):
         history = load_file('../../DATA/MERGE.log.gz')
-        buy, sell = history.market_price(history.end_time - pd.Timedelta(seconds=60))
+        buy, sell = history.limit_price(history.end_time - pd.Timedelta(seconds=60))
         print(buy, sell)
 
     def test_execute_price(self):
@@ -174,14 +208,13 @@ class MyTestCase(unittest.TestCase):
     def test_dollar_bar1(self):
         history = load_file('../../DATA/MERGE.log.gz')
 
-        df = history.dollar_bar(tick_vol=10)
+        df = history.setup_dollar_bar(tick_vol=10)
 
         plt.hist(df['close'])
         plt.show()
 
         plt.scatter(df.index, df['close'])
         plt.show()
-
 
     def test_doll_bar2(self):
         history = load_file('../../DATA/MERGE.log.gz')
@@ -253,6 +286,15 @@ class MyTestCase(unittest.TestCase):
         d_df.to_json('d.json', orient='records')
 
 
+    def test_update_price(self):
+        history = load_file('../../DATA/MERGE.log.gz')
+        history.setup_dollar_bar()
+
+        df = history.dollar_bar
+
+        df['short'] = df['time'].map(min)
+
+        print(df)
 
 
 
@@ -288,6 +330,8 @@ class MyTestCase(unittest.TestCase):
             time = int(r[1].value / 1000_000_000)
             if last_time == time:
                 continue
+
+
 
 
 #        long_df.to_json('long.json', orient='records')
