@@ -183,6 +183,16 @@ class History:
 
         return long_list, short_list
 
+    def _get_board_price(self, time):
+        bit, ask = self.get_board(time)
+
+        bit_price = bit[0][0]
+        bit_volume = bit[0][1]
+        ask_price = ask[0][0]
+        ask_volume = ask[0][1]
+
+        return bit_price, bit_volume, ask_price, ask_volume
+
     def market_price(self, time, volume=0):
         """
         :param time: unix_time(UTC) to select
@@ -195,6 +205,8 @@ class History:
         ask_price = ask[0][0]
         ask_volume = ask[0][1]
 
+        bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
+
         bit_execute_price = execute_price(ask, volume+bit_volume)
         if bit_price < bit_execute_price:
             bit_price = bit_execute_price
@@ -206,15 +218,17 @@ class History:
         return bit_price, ask_price
 
     def limit_price(self, time, volume=0, window=10):
-        bit, ask = self.get_board(time)
-
-        bit_price = bit[0][0]
-        bit_volume = bit[0][1]
-        ask_price = ask[0][0]
-        ask_volume = ask[0][1]
+        '''
+        TODO: adding execution time.
+        :param time:
+        :param volume:
+        :param window:
+        :return: bit_price, ask_price
+        '''
+        bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
 
         # todo: bit_volume and ask_volume must be setup by separately
-        bit_execute_price, ask_execute_price = self.calc_limit_price(time, volume+bit_volume+ask_volume, window)
+        bit_execute_price, ask_execute_price = self.calc_limit_price(time, volume + bit_volume + ask_volume, window)
 
         if (ask_execute_price is None) or (bit_price < ask_execute_price):
             bit_price = None
@@ -246,6 +260,15 @@ class History:
         self.dollar_bar = df
 
         return df
+
+    def _calc_order_price(self, time):
+        market_prices = self.market_price(time)
+        limit_prices = self.limit_price(time)
+        return pd.Series([market_prices[0], market_prices[1], limit_prices[0], limit_prices[1]])
+
+    def update_price(self):
+        self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
+            self.dollar_bar['time_stamp'].apply(self._calc_order_price)
 
     def setup_execute_price(self):
         for index, row in self.dollar_bar.iterrows():
