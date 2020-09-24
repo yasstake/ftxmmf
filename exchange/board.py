@@ -44,7 +44,7 @@ def execute_df_to_list(df, reverse=False):
     return df.values.tolist()
 
 
-def _chop_log_data(df, *, start=None, end=None):
+def _chop_log_data(df, *, start=None, end=None, time_key=TIME):
     """
     chop log data as specified time frame
     :param df: pandas dataframe
@@ -56,11 +56,11 @@ def _chop_log_data(df, *, start=None, end=None):
     end = timestamp(end)
 
     if (start is None) or (start <= timestamp(0)):
-        df = df[df[TIME] <= end]
+        df = df[df[time_key] <= end]
     elif end is None:
-        df = df[start < df[TIME]]
+        df = df[start < df[time_key]]
     if start and end:
-        df = df[(start < df[TIME]) & (df[TIME] <= end)]
+        df = df[(start < df[time_key]) & (df[time_key] <= end)]
     else:
         print('ERROR param　error chop_log_data')
     return df
@@ -270,12 +270,51 @@ class History:
         self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
             self.dollar_bar['time_stamp'].apply(self._calc_order_price)
 
-    def setup_execute_price(self):
-        for index, row in self.dollar_bar.iterrows():
-            bit_price, ask_price = self.market_price(row.time)
-            long_price, short_price = self.limit_price(row.time)
+    def _calc_q_value(self, row):
+        time_stamp = row['time_stamp']
 
-            self.dollar_bar[index]
+        market_buy = row['market_buy']
+        market_sell = row['market_sell']
+        limit_buy = row['limit_buy']
+        limit_sell = row['limit_sell']
+
+        dollar_bar = _chop_log_data(self.dollar_bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=60),
+                                    time_key='time_stamp')
+
+        min_df = dollar_bar.min()
+        max_df = dollar_bar.max()
+
+        min_market_buy = min_df['market_buy']
+        min_limit_buy = min_df['limit_buy']
+
+        min_buy_price = min_market_buy
+        if min_limit_buy and min_limit_buy < min_buy_price:
+            min_buy_price = min_limit_buy
+
+        max_market_sell = max_df['market_sell']
+        max_limit_sell = max_df['limit_sell']
+
+        max_sell_price = max_market_sell
+        if max_limit_sell and max_market_sell < max_limit_sell:
+            max_sell_price = max_limit_sell
+
+        q_market_buy = max_sell_price - market_buy
+        q_market_sell = market_sell - min_buy_price
+
+        q_limit_buy = None
+        if limit_buy:
+            q_limit_buy = max_sell_price - limit_buy
+
+        q_limit_sell = None
+        if limit_sell:
+            q_limit_sell = limit_sell - min_buy_price
+
+        return q_limit_buy, q_limit_sell, q_market_buy, q_market_sell
+
+
+    def update_q_value(self):
+        pass
+
 
 
     '''
