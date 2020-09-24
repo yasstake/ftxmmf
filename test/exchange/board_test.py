@@ -331,7 +331,13 @@ class MyTestCase(unittest.TestCase):
             if last_time == time:
                 continue
 
+    def test_update_q_value(self):
+        #history = load_file('../../DATA/MERGE.log.gz')
+        history = load_file('../../MERGE-2020-05-04.log.gz')
+        history.setup_dollar_bar()
 
+        history.update_price()
+        history.update_q_value()
 
 
 #        long_df.to_json('long.json', orient='records')

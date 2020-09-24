@@ -271,6 +271,12 @@ class History:
             self.dollar_bar['time_stamp'].apply(self._calc_order_price)
 
     def _calc_q_value(self, row):
+        '''
+        calc Q value for each action
+        TODO: trading free must be applied
+        :param row:
+        :return:
+        '''
         time_stamp = row['time_stamp']
 
         market_buy = row['market_buy']
@@ -309,12 +315,11 @@ class History:
         if limit_sell:
             q_limit_sell = limit_sell - min_buy_price
 
-        return q_limit_buy, q_limit_sell, q_market_buy, q_market_sell
-
+        return pd.Series([q_market_buy, q_market_sell, q_limit_buy, q_limit_sell])
 
     def update_q_value(self):
-        pass
-
+        self.dollar_bar[['q_market_buy', 'q_market_sell', 'q_limit_buy', 'q_limit_sell']] = \
+            self.dollar_bar.apply(self._calc_q_value, axis=1)
 
 
     '''
