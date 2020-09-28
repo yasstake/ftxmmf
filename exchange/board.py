@@ -81,6 +81,29 @@ def execute_price(data, volume):
     return None
 
 
+def _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price):
+    """
+    calc prices to be expected
+    :param bit_price: bit price by user
+    :param bit_execute_price: best executed price(bit)
+    :param ask_price: ask price by user
+    :param ask_execute_price: best executed price(ask)
+    :return:
+    >>> _calc_execute_price(100, 100, 101, 101)
+    (100, 101)
+    >>> _calc_execute_price(100, 99, 101, 100)
+    (100, 100)
+    >>> _calc_execute_price(100, 101, 101, 102)
+    (101, 101)
+    """
+    if bit_price < bit_execute_price:
+        bit_price = bit_execute_price
+
+    if ask_execute_price < ask_price:
+        ask_price = ask_execute_price
+
+    return bit_price, ask_price
+
 class History:
     def __init__(self):
         """
@@ -126,8 +149,9 @@ class History:
         """
         df = self._select_board_df(time)
         bit = df[df[ACTION] == Action.UPDATE_BIT]
-        ask = df[df[ACTION] == Action.UPDATE_ASK]
         bit = bit.drop_duplicates(subset=PRICE, keep='last')
+
+        ask = df[df[ACTION] == Action.UPDATE_ASK]
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
 
         return bit[bit[VOLUME] != 0], ask[ask[VOLUME] != 0]
@@ -149,6 +173,10 @@ class History:
         """
         partial = df[df[ACTION] == Action.PARTIAL]
         last_partial = partial.drop_duplicates(subset=ACTION, keep='last')
+
+        if len(last_partial) == 0:
+            print('TOO SHORT DATA(partial record is not found)')
+
         partial_index = last_partial.index[0]
 
         return partial_index
@@ -195,6 +223,7 @@ class History:
 
     def market_price(self, time, volume=0):
         """
+        TODO: add execution delay
         :param time: unix_time(UTC) to select
         :return: board price(ask_price, ask_size, bit_price, bit_size)
         """
@@ -206,25 +235,23 @@ class History:
         ask_volume = ask[0][1]
 
         bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
-
         bit_execute_price = execute_price(ask, volume+bit_volume)
-        if bit_price < bit_execute_price:
-            bit_price = bit_execute_price
-
         ask_execute_price = execute_price(bit, volume+ask_volume)
-        if ask_execute_price < ask_price:
-            ask_price = ask_execute_price
 
-        return bit_price, ask_price
+        return self._calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price)
 
-    def limit_price(self, time, volume=0, window=10):
+
+
+    def limit_price(self, time, volume=0, window=10, delay=1):
         '''
         TODO: adding execution time.
         :param time:
         :param volume:
         :param window:
+        :param delay: delay time to execute
         :return: bit_price, ask_price
         '''
+        time = time + pd.Timedelta(seconds=delay)
         bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
 
         # todo: bit_volume and ask_volume must be setup by separately
@@ -238,7 +265,8 @@ class History:
 
         return bit_price, ask_price
 
-    def calc_limit_price(self, time, volume=0, window=10):
+    def calc_limit_price(self, time, volume=0, window=10, delay=1):
+        time = time + pd.Timedelta(seconds=delay)
         window = pd.Timedelta(seconds=window)
         long, short = self.select_execute(time, time+window)
 

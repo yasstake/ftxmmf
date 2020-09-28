@@ -332,8 +332,12 @@ class MyTestCase(unittest.TestCase):
                 continue
 
     def test_update_q_value(self):
-        #history = load_file('../../DATA/MERGE.log.gz')
-        history = load_file('../../MERGE-2020-05-04.log.gz')
+        '''
+        TODO: ../../DATA/MERGE.log.gz may have only one partial index. TO BE INVESTIGATED.
+        :return:
+        '''
+        #history = load_file('../../DATA/MERGE.log.gz')    # NG
+        history = load_file('../../MERGE-2020-05-04.log.gz') # OK
         history.setup_dollar_bar()
 
         history.update_price()
