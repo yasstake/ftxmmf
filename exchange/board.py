@@ -120,7 +120,7 @@ class History:
 
     def chop_max_time_width(self):
         """
-
+        TODO: chop at partial event
         :return:
         """
         one_day_before = self.end_time - self.board_time_width
@@ -132,8 +132,19 @@ class History:
         initialize start_time and end_time accroding to the trade log.
         """
         df = self.log_data
-        self.start_time = df.head(1).iat[0, 1]
-        self.end_time = df.tail(1).iat[0, 1]
+
+        partial = df[df[ACTION] == Action.PARTIAL]
+        first_partial_rec = partial.index[0]
+        last_rec = df.shape[0] - 1
+
+        self.start_time = df.loc[first_partial_rec]['time']
+        self.end_time = df.loc[last_rec]['time']
+        self.log_data = self.log_data[first_partial_rec:]
+
+    def trim_after(self, end_time):
+        df = self.log_data[(self.log_data['time'] < end_time)]
+        df.reset_index(inplace=True)
+        self.log_data = df
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
@@ -272,17 +283,20 @@ class History:
 
     def setup_dollar_bar(self, tick_vol=5):
         df = self._filter_execute(self.log_data).copy()
+        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
         max_vol = df[VOLUME].sum()
         start = int(max_vol + tick_vol) - max_vol
 
         ticks = np.arange(start, max_vol, tick_vol)
         df['sum'] = df[VOLUME].cumsum()
         bins = pd.cut(df['sum'], ticks)
-        df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min']}, axis=1)
-        df.columns = ['time_stamp', 'open', 'close', 'high', 'low']
+        df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
+                                   'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
+        df.columns = ['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']
         df.reset_index(drop=True, inplace=True)
         df.index.name = 'time'
-        df = df[['time_stamp', 'open', 'close', 'high', 'low']]
+        df = df[['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']]
         self.dollar_bar = df
 
         return df
@@ -364,12 +378,21 @@ def load_file(file) -> History:
     names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
     df = pd.read_csv(file, names=names)
     df[TIME] = pd.to_datetime(df[TIME] * 1000)
+    df[PRICE] = df[PRICE] / 10
     history = History()
     history.log_data = df
     history.update_log_time_frame()
 
     return history
 
+
+def merge(first: History, second: History):
+    cut_time = second.start_time
+    first.trim_after(cut_time)
+    df = pd.concat([first.log_data, second.log_data])
+    first.log_data = df
+
+    return first
 
 if __name__ == "__main__":
     import doctest
