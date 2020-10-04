@@ -240,8 +240,6 @@ class History:
 
         return self._calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price)
 
-
-
     def limit_price(self, time, volume=0, window=10, delay=1):
         '''
         TODO: adding execution time.
@@ -349,14 +347,12 @@ class History:
         self.dollar_bar[['q_market_buy', 'q_market_sell', 'q_limit_buy', 'q_limit_sell']] = \
             self.dollar_bar.apply(self._calc_q_value, axis=1)
 
+    def ochlv(self):
+        df = self._filter_execute(self.log_data).copy()
+        df = df.set_index('time')
+        df = df['price'].resample('m').agg({'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last'})
 
-    '''
-    def open_interest(self, time, time_window=60):
-        long_df = self._filter_long(self.log_data)
-        short_df = self._filter_short(self.log_data)
-
-        open_long = long_df
-    '''
+        return df
 
 
 def load_file(file) -> History:
