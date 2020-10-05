@@ -145,6 +145,7 @@ class History:
         df = self.log_data[(self.log_data['time'] < end_time)]
         df.reset_index(inplace=True)
         self.log_data = df
+        self.update_log_time_frame()
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
@@ -373,6 +374,14 @@ class History:
 
         return df
 
+    def merge(self, history):
+        cut_time = history.start_time
+        self.trim_after(cut_time)
+        df = pd.concat([self.log_data, history.log_data])
+        df.reset_index(inplace=True)
+        self.log_data = df
+        self.update_log_time_frame()
+
 
 def load_file(file) -> History:
     '''
@@ -390,14 +399,6 @@ def load_file(file) -> History:
 
     return history
 
-
-def merge(first: History, second: History):
-    cut_time = second.start_time
-    first.trim_after(cut_time)
-    df = pd.concat([first.log_data, second.log_data])
-    first.log_data = df
-
-    return first
 
 if __name__ == "__main__":
     import doctest
