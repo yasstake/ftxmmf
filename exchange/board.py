@@ -282,6 +282,11 @@ class History:
         return execute_price(long, volume), execute_price(short, volume)
 
     def setup_dollar_bar(self, tick_vol=5):
+        """
+        setup dollar bar.
+        :param tick_vol: average volume of each bar.
+        :return: dollar bar df.
+        """
         df = self._filter_execute(self.log_data).copy()
         df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
         df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']

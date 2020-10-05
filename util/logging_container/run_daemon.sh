@@ -12,6 +12,8 @@ docker run --name FTX-A${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf 
 sleep 20
 docker run --name BB-A${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/bb2log.sh
 sleep 20
+docker run --name BB2-A${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/bb2log2.sh
+sleep 20
 docker run --name OK-A${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/ok2log.sh
 
 
@@ -24,6 +26,8 @@ sleep 20
 docker run --name FTX-B${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/ftx2log.sh
 sleep 20
 docker run --name BB-B${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/bb2log.sh
+sleep 20
+docker run --name BB2-B${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/bb2log2.sh
 sleep 20
 docker run --name OK-B${NAME} -d -v /bitlog:/bitlog --restart=always -t ftxmmf bash /ftxmmf/ok2log.sh
 

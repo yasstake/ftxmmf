@@ -1,0 +1,9 @@
+pandas~=1.0.3
+matplotlib~=3.2.2
+numpy~=1.18.1
+websocket-client~=0.57.0
+zlib~=1.2.11
+datetime~=4.3
+tqdm~=4.45.0
+talib
+#TA-LIB

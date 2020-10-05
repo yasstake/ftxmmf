@@ -1,3 +1,4 @@
+import talib
 
 
 class Indicator:
