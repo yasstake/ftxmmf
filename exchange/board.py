@@ -105,7 +105,7 @@ def _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_pri
     return bit_price, ask_price
 
 class History:
-    def __init__(self):
+    def __init__(self, file=None):
         """
         >>> history = History()
         >>> history is not None
@@ -117,6 +117,32 @@ class History:
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
         self.dollar_bar = None
+
+        if file:
+            self._load(file)
+
+    def load(self, file):
+        if self.log_data is not None:
+            append_history = History(file)
+            self.merge(append_history)
+        else:
+            self._load(file)
+
+    def _load(self, file):
+        names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
+        df = pd.read_csv(file, names=names)
+        df[TIME] = pd.to_datetime(df[TIME] * 1000)
+        df[PRICE] = df[PRICE] / 10
+        self.log_data = df
+        self.update_log_time_frame()
+
+    def merge(self, history):
+        cut_time = history.start_time
+        self.trim_after(cut_time)
+        df = pd.concat([self.log_data, history.log_data], ignore_index=True)
+        df.reset_index(inplace=True, drop=True)
+        self.log_data = df
+        self.update_log_time_frame()
 
     def chop_max_time_width(self):
         """
@@ -143,7 +169,7 @@ class History:
 
     def trim_after(self, end_time):
         df = self.log_data[(self.log_data['time'] < end_time)]
-        df.reset_index(inplace=True)
+        df.reset_index(inplace=True, drop=True)
         self.log_data = df
         self.update_log_time_frame()
 
@@ -374,13 +400,6 @@ class History:
 
         return df
 
-    def merge(self, history):
-        cut_time = history.start_time
-        self.trim_after(cut_time)
-        df = pd.concat([self.log_data, history.log_data])
-        df.reset_index(inplace=True)
-        self.log_data = df
-        self.update_log_time_frame()
 
 
 def load_file(file) -> History:
@@ -389,15 +408,7 @@ def load_file(file) -> History:
     :param file: path to file
     :return history object
     '''
-    names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
-    df = pd.read_csv(file, names=names)
-    df[TIME] = pd.to_datetime(df[TIME] * 1000)
-    df[PRICE] = df[PRICE] / 10
-    history = History()
-    history.log_data = df
-    history.update_log_time_frame()
-
-    return history
+    return History(file)
 
 
 if __name__ == "__main__":
