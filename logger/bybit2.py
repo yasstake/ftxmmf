@@ -32,7 +32,7 @@ class BybitClient:
         )
 
         self.ws.on_open = self.on_open
-        self.log = Logger(log_file_dir=log_dir, process_name='BB2', flag_file_dir=log_dir, compress=False)
+        self.log = Logger(log_file_dir=log_dir, process_name='BB2', flag_file_dir=log_dir, compress=True)
         self.current_time = None
         self.partial = False
         self.terminate_count = 0
