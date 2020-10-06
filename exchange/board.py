@@ -280,6 +280,7 @@ class History:
         :param time: unix_time(UTC) to select
         :return: board price(ask_price, ask_size, bit_price, bit_size)
         """
+
         bit, ask = self.get_board(time)
 
         bit_price = bit[0][0]
@@ -287,7 +288,7 @@ class History:
         ask_price = ask[0][0]
         ask_volume = ask[0][1]
 
-        bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
+        # bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
         bit_execute_price = execute_price(ask, volume+bit_volume)
         ask_execute_price = execute_price(bit, volume+ask_volume)
 
@@ -349,7 +350,7 @@ class History:
         df.index.name = 'time'
         df = df[['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']]
 
-        df['bs_ratio'] = df['buy_volume'] / df['sell_volume']
+        df['bs_ratio'] = df['buy_volume'] / (df['sell_volume']+df['buy_volume'])
         self.dollar_bar = df
 
         return df

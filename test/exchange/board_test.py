@@ -344,11 +344,32 @@ class MyTestCase(unittest.TestCase):
         history.setup_dollar_bar()
 
         history.update_price()
-        history.update_q_value()
+        #history.update_q_value()
 
         print(history.dollar_bar)
 
+
     def test_update_q_value2(self):
+        '''
+        :return:
+        '''
+        # history = load_file('../../DATA/MERGE.log.gz')    # NG
+        history = load_file('../../MERGE-2020-05-04.log.gz') # OK
+        history.board_time_width = pd.Timedelta('1 h')
+        history.setup_dollar_bar()
+        print(history.dollar_bar)
+
+
+        history.update_price()
+        print(history.dollar_bar)
+
+        history.update_q_value()
+
+
+
+
+
+    def test_update_q_value3(self):
         '''
         :return:
         '''
