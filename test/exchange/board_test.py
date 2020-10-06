@@ -108,9 +108,6 @@ class MyTestCase(unittest.TestCase):
         last_index = history._get_last_partial_index(history.log_data)
         print(last_index)
 
-        last_index = history._get_last_partial_index(history._chop_log_data(history.log_data, start=0, end=1))
-        print(last_index)
-
     def test_get_board_price(self):
         history = load_file('../../DATA/MERGE.log.gz')
         bit, ask = history.market_price(history.end_time - pd.Timedelta(seconds=60))
@@ -181,15 +178,16 @@ class MyTestCase(unittest.TestCase):
         plt.hist(short_df[PRICE])
         plt.show()
 
-
-
-
     def test_loop_df(self):
         history = load_file('../../DATA/MERGE.log.gz')
         df = history.log_data
 
+        i = 0
         for loc, rec in df.iterrows():
             print(loc)
+            i = i + 1
+            if 100 < i:
+                break
 
     def test_export_to_json(self):
         history = load_file('../../DATA/MERGE.log.gz')
@@ -202,8 +200,22 @@ class MyTestCase(unittest.TestCase):
     def test_print_rows(self):
         history = load_file('../../DATA/MERGE.log.gz')
         df = history._filter_execute(history.log_data)
+        i = 0
         for index, row in df.iterrows():
+            i = i + 1
+            if 100 < i:
+                break
             print(row)
+
+    def test_get_board(self):
+        history = History('../../DATA/MERGE.log.gz')
+        board = history.get_board(history.start_time)
+        print(board)
+
+        print('--------')
+        board = history.get_board(history.end_time)
+        print(board)
+
 
     def test_dollar_bar1(self):
         history = load_file('../../DATA/MERGE.log.gz')
@@ -215,6 +227,7 @@ class MyTestCase(unittest.TestCase):
 
         plt.scatter(df.index, df['close'])
         plt.show()
+
 
     def test_doll_bar2(self):
         history = load_file('../../DATA/MERGE.log.gz')
@@ -285,17 +298,15 @@ class MyTestCase(unittest.TestCase):
 
         d_df.to_json('d.json', orient='records')
 
-
     def test_update_price(self):
         history = load_file('../../DATA/MERGE.log.gz')
         history.setup_dollar_bar()
 
         df = history.dollar_bar
 
-        df['short'] = df['time'].map(min)
-
         print(df)
 
+        print(df[df['time_stamp'].isnull()])
 
 
     def write_json(self, df, file):
@@ -324,16 +335,8 @@ class MyTestCase(unittest.TestCase):
                 not_first = True
             f.write(']')
 
-    def test_doll_bar(self):
-
-        for r in df.itertuples(name=None):
-            time = int(r[1].value / 1000_000_000)
-            if last_time == time:
-                continue
-
     def test_update_q_value(self):
         '''
-        TODO: ../../DATA/MERGE.log.gz may have only one partial index. TO BE INVESTIGATED.
         :return:
         '''
         #history = load_file('../../DATA/MERGE.log.gz')    # NG
@@ -343,6 +346,20 @@ class MyTestCase(unittest.TestCase):
         history.update_price()
         history.update_q_value()
 
+        print(history.dollar_bar)
+
+    def test_update_q_value2(self):
+        '''
+        :return:
+        '''
+        history = load_file('../../DATA/MERGE.log.gz')    # NG
+        # history = load_file('../../MERGE-2020-05-04.log.gz') # OK
+        history.setup_dollar_bar()
+
+        history.update_price()
+        history.update_q_value()
+
+        print(history.dollar_bar)
 
 #        long_df.to_json('long.json', orient='records')
 

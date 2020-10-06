@@ -63,6 +63,10 @@ def _chop_log_data(df, *, start=None, end=None, time_key=TIME):
         df = df[(start < df[time_key]) & (df[time_key] <= end)]
     else:
         print('ERROR param　error chop_log_data')
+
+    if len(df) == 0:
+        print('chop too short', start, end)
+
     return df
 
 
@@ -199,6 +203,9 @@ class History:
         start_time = time - self.board_time_width
         df = _chop_log_data(self.log_data, start=start_time, end=time)
         partial_index = self._get_last_partial_index(df)
+        if partial_index is None:
+            print(self.board_time_width)
+            print('short->', time, start_time, self.start_time, self.end_time)
         df = df.iloc[partial_index:]
 
         return df
@@ -210,12 +217,20 @@ class History:
         :return: partial index no of df
         """
         partial = df[df[ACTION] == Action.PARTIAL]
+
+        if len(partial) == 0:
+            print('TOO SHORT DATA(partial record is not found)')
+            return None
+
+        partial = partial[-1:]
+        partial_index = partial.index[0]
+
+        '''
         last_partial = partial.drop_duplicates(subset=ACTION, keep='last')
 
-        if len(last_partial) == 0:
-            print('TOO SHORT DATA(partial record is not found)')
 
         partial_index = last_partial.index[0]
+        '''
 
         return partial_index
 
@@ -276,7 +291,7 @@ class History:
         bit_execute_price = execute_price(ask, volume+bit_volume)
         ask_execute_price = execute_price(bit, volume+ask_volume)
 
-        return self._calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price)
+        return _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price)
 
     def limit_price(self, time, volume=0, window=10, delay=1):
         '''
@@ -310,6 +325,7 @@ class History:
 
     def setup_dollar_bar(self, tick_vol=5):
         """
+        TODO: if tick_vol is smaller than one trade, missing bar is generated.
         setup dollar bar.
         :param tick_vol: average volume of each bar.
         :return: dollar bar df.
@@ -326,14 +342,22 @@ class History:
         df = df.groupby(bins).agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
                                    'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
         df.columns = ['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']
+
+        # TODO: check drop is OK or Not for missing record
+        df.dropna(inplace=True)
         df.reset_index(drop=True, inplace=True)
         df.index.name = 'time'
         df = df[['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']]
+
+        df['bs_ratio'] = df['buy_volume'] / df['sell_volume']
         self.dollar_bar = df
 
         return df
 
     def _calc_order_price(self, time):
+        if not time:
+            print(time)
+
         market_prices = self.market_price(time)
         limit_prices = self.limit_price(time)
         return pd.Series([market_prices[0], market_prices[1], limit_prices[0], limit_prices[1]])
