@@ -239,13 +239,21 @@ class OrderBook:
 
     def set_bids(self, price, size):
         if size == 0:
-            del self.bids[price]
+            try:
+                del self.bids[price]
+            except KeyError:
+                pass
+                # print('nokey', price)
         else:
             self.bids[price] = size
 
     def set_asks(self, price, size):
         if size == 0:
-            del self.asks[price]
+            try:
+                del self.asks[price]
+            except KeyError:
+                pass
+                # print('nokey', price)
         else:
             self.asks[price] = size
 

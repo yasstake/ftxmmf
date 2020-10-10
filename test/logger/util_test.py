@@ -30,8 +30,10 @@ class MyTestCase(unittest.TestCase):
 
     def test_order_book_to_string(self):
         ob = OrderBook()
-        ob.set_asks(1, 2)
+        ob.clear()
         ob.set_asks(1.1, 2)
+        ob.set_asks(1, 2)
+        ob.clear()
         ob.set_asks(1, 0)
         ob.set_bids(100, 2)
         ob.set_bids(105, 2)

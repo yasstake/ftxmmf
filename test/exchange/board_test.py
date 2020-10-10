@@ -2,7 +2,8 @@ import unittest
 from exchange.board import *
 import matplotlib.pyplot as plt
 import numpy as np
-
+from logger.util import OrderBook
+import time
 
 class MyTestCase(unittest.TestCase):
     def test_load_file(self):
@@ -348,23 +349,54 @@ class MyTestCase(unittest.TestCase):
 
         print(history.dollar_bar)
 
+    def test_update_board(self):
+        history = load_file('../../DATA/MERGE.log.gz') # OK
+
+        order_book = OrderBook()
+        df = history.log_data
+        row_count = 0
+        partial = False
+        for index, row in df.iterrows():
+            row_count = row_count + 1
+            if partial:
+                if row.action == Action.UPDATE_ASK:
+                    order_book.set_asks(row.price, row.volume)
+                elif row.action == Action.UPDATE_BIT:
+                    order_book.set_bids(row.price, row.volume)
+
+            if row.action == Action.PARTIAL:
+                # print('partial', row.time, row_count)
+                partial = True
+                order_book.clear()
+
 
     def test_update_q_value2(self):
         '''
         :return:
         '''
+        t = time.time()
         # history = load_file('../../DATA/MERGE.log.gz')    # NG
         history = load_file('../../MERGE-2020-05-04.log.gz') # OK
-        history.board_time_width = pd.Timedelta('1 h')
+        print(history.start_time, history.end_time)
+        print('load time', time.time() - t)
+
+
+        t = time.time()
         history.setup_dollar_bar()
-        print(history.dollar_bar)
+        print('setup dollar bar', time.time() - t)
 
-
+        t = time.time()
         history.update_price()
-        print(history.dollar_bar)
+        print('update price', time.time() - t)
 
+
+        t = time.time()
+        history.update_price()
+        print('update price2', time.time() - t)
+
+        t = time.time()
         history.update_q_value()
-
+        print('update q value', time.time() - t)
 
 
 

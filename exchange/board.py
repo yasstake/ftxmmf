@@ -55,12 +55,12 @@ def _chop_log_data(df, *, start=None, end=None, time_key=TIME):
     start = timestamp(start)
     end = timestamp(end)
 
-    if (start is None) or (start <= timestamp(0)):
+    if start and end:
+        df = df[(start < df[time_key]) & (df[time_key] <= end)]
+    elif (start is None) or (start <= timestamp(0)):
         df = df[df[time_key] <= end]
     elif end is None:
         df = df[start < df[time_key]]
-    if start and end:
-        df = df[(start < df[time_key]) & (df[time_key] <= end)]
     else:
         print('ERROR param　error chop_log_data')
 
@@ -108,6 +108,28 @@ def _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_pri
 
     return bit_price, ask_price
 
+
+def _filter_long(df):
+    return df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
+
+
+def _filter_short(df):
+    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
+
+
+def _filter_execute(df):
+    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID,
+                                         Action.TRADE_LONG, Action.TRADE_SHORT_LIQUID])]
+
+
+def _filter_bit(df):
+    return df[df[ACTION] == Action.UPDATE_BIT]
+
+
+def _filter_ask(df):
+    return df[df[ACTION] == Action.UPDATE_ASK]
+
+
 class History:
     def __init__(self, file=None):
         """
@@ -137,6 +159,7 @@ class History:
         df = pd.read_csv(file, names=names)
         df[TIME] = pd.to_datetime(df[TIME] * 1000)
         df[PRICE] = df[PRICE] / 10
+
         self.log_data = df
         self.update_log_time_frame()
 
@@ -184,19 +207,51 @@ class History:
 
         return bit_board, ask_board
 
+    def get_board_prices(self, time, volume):
+        '''
+
+        :param time:
+        :param volume:
+        :return: bit_edge_price, bit_execute_price, ask_edge_price, ask_execute_price
+        '''
+        bit, ask = self.get_board(time)
+        try:
+            bit_edge_price = bit[0][0]
+            bit_edge_volume = bit[0][1]
+            ask_edge_price = ask[0][0]
+            ask_edge_volume = ask[0][1]
+        except IndexError:
+            print('Index error', time)
+            print('bit->', bit)
+            print('ask->', ask)
+
+        bit_execute_price = execute_price(bit, volume)
+        ask_execute_price = execute_price(ask, volume)
+
+        return bit_edge_price, bit_edge_volume, bit_execute_price,\
+               ask_edge_price, ask_edge_volume, ask_execute_price
+
+
     def _get_board_df(self, time):
         """
         :param time:
         :return: asks, bits
         """
         df = self._select_board_df(time)
+
         bit = df[df[ACTION] == Action.UPDATE_BIT]
         bit = bit.drop_duplicates(subset=PRICE, keep='last')
+        bit = bit[bit[VOLUME] != 0]
+        if len(bit) == 0:
+            print('too short bit', time)
 
         ask = df[df[ACTION] == Action.UPDATE_ASK]
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
+        ask = ask[ask[VOLUME] != 0]
+        if len(bit) == 0:
+            print('too short ask', time)
 
-        return bit[bit[VOLUME] != 0], ask[ask[VOLUME] != 0]
+        return bit, ask
 
     def _select_board_df(self, time):
         time = timestamp(time)
@@ -224,33 +279,12 @@ class History:
 
         partial = partial[-1:]
         partial_index = partial.index[0]
-
-        '''
-        last_partial = partial.drop_duplicates(subset=ACTION, keep='last')
-
-
-        partial_index = last_partial.index[0]
-        '''
-
         return partial_index
-
-    def _filter_long(self, df):
-        long_df = df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
-        return long_df
-
-    def _filter_short(self, df):
-        short_df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
-        return short_df
-
-    def _filter_execute(self, df):
-        df = df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID,
-                                         Action.TRADE_LONG, Action.TRADE_SHORT_LIQUID])]
-        return df
 
     def _select_execute_df(self, start, end):
         df = _chop_log_data(self.log_data, start=start, end=end)
-        long_df = self._filter_long(df)
-        short_df = self._filter_short(df)
+        long_df = _filter_long(df)
+        short_df = _filter_short(df)
 
         long_df = long_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
         short_df = short_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
@@ -280,13 +314,15 @@ class History:
         :param time: unix_time(UTC) to select
         :return: board price(ask_price, ask_size, bit_price, bit_size)
         """
-
         bit, ask = self.get_board(time)
 
-        bit_price = bit[0][0]
-        bit_volume = bit[0][1]
-        ask_price = ask[0][0]
-        ask_volume = ask[0][1]
+        try:
+            bit_price = bit[0][0]
+            bit_volume = bit[0][1]
+            ask_price = ask[0][0]
+            ask_volume = ask[0][1]
+        except IndexError:
+            print('get board error', bit, ask)
 
         # bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
         bit_execute_price = execute_price(ask, volume+bit_volume)
@@ -331,7 +367,7 @@ class History:
         :param tick_vol: average volume of each bar.
         :return: dollar bar df.
         """
-        df = self._filter_execute(self.log_data).copy()
+        df = _filter_execute(self.log_data).copy()
         df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
         df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
         max_vol = df[VOLUME].sum()
@@ -353,19 +389,40 @@ class History:
         df['bs_ratio'] = df['buy_volume'] / (df['sell_volume']+df['buy_volume'])
         self.dollar_bar = df
 
+        self.dollar_bar['market_buy'] = None
+        self.dollar_bar['market_sell'] = None
+        self.dollar_bar['limit_buy'] = None
+        self.dollar_bar['limit_sell'] = None
+
         return df
 
-    def _calc_order_price(self, time):
+    def _calc_order_price(self, row, delay=1, window=60, volume=1):
+        if row['market_buy']:
+            return pd.Series([row['market_buy'], row['market_sell'], row['limit_buy'], row['limit_sell']])
+
+        time = row['time_stamp']
         if not time:
             print(time)
 
-        market_prices = self.market_price(time)
-        limit_prices = self.limit_price(time)
-        return pd.Series([market_prices[0], market_prices[1], limit_prices[0], limit_prices[1]])
+        ask_edge_price, ask_edge_volume, ask_market_price,\
+            bit_edge_price, bit_edge_volume, bit_market_price = \
+                  self.get_board_prices(time, volume)
+
+        ask_volume = volume + ask_edge_volume
+        bit_volume = volume + bit_edge_volume
+
+        time = time + pd.Timedelta(seconds=delay)
+        window = pd.Timedelta(seconds=window)
+        long, short = self.select_execute(time, time+window)
+        bit_execute_price, ask_execute_price = \
+            execute_price(long, bit_volume), execute_price(short, ask_volume)
+
+        return pd.Series([bit_market_price, ask_market_price,
+                          bit_execute_price, ask_execute_price])
 
     def update_price(self):
         self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
-            self.dollar_bar['time_stamp'].apply(self._calc_order_price)
+             self.dollar_bar.apply(self._calc_order_price, axis=1)
 
     def _calc_q_value(self, row):
         '''
@@ -381,8 +438,14 @@ class History:
         limit_buy = row['limit_buy']
         limit_sell = row['limit_sell']
 
+        '''
+        print(row.index[0])
+        dollar_bar = self.dollar_bar.iloc[row.index:]
+        '''
+
         dollar_bar = _chop_log_data(self.dollar_bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=60),
                                     time_key='time_stamp')
+
 
         min_df = dollar_bar.min()
         max_df = dollar_bar.max()
@@ -419,7 +482,7 @@ class History:
             self.dollar_bar.apply(self._calc_q_value, axis=1)
 
     def ochlv(self):
-        df = self._filter_execute(self.log_data).copy()
+        df = _filter_execute(self.log_data).copy()
         df = df.set_index('time')
         df = df['price'].resample('m').agg({'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last'})
 
