@@ -200,13 +200,13 @@ class MyTestCase(unittest.TestCase):
 
     def test_print_rows(self):
         history = load_file('../../DATA/MERGE.log.gz')
-        df = history._filter_execute(history.log_data)
-        i = 0
+        df = history.log_data
+
+        t = time.time()
         for index, row in df.iterrows():
-            i = i + 1
-            if 100 < i:
-                break
-            print(row)
+            pass
+
+        print('iterrows->', time.time()-t)
 
     def test_get_board(self):
         history = History('../../DATA/MERGE.log.gz')
@@ -414,7 +414,68 @@ class MyTestCase(unittest.TestCase):
 
         print(history.dollar_bar)
 
-#        long_df.to_json('long.json', orient='records')
+    def test_load_merge(self):
+        history1 = load_file('../../DATA/BB/05/BB-2020-05-09T07-09-35.132396Z.log.gz')
+        history1.setup_dollar_bar()
+        history1.update_price()
+        history1.update_q_value()
+
+        history2 = load_file('../../DATA/BB/05/BB-2020-05-09T08-00-27.465324Z.log.gz')
+        history2.setup_dollar_bar()
+        history2.update_price()
+        history2.update_q_value()
+
+        history1.merge_log(history2)
+
+    def test_load_files(self):
+        files = (
+            'BB-2020-10-01T00-09-41.084127Z.log.gz',
+            'BB-2020-10-01T01-00-58.670877Z.log.gz',
+            'BB-2020-10-01T01-53-02.064144Z.log.gz',
+            'BB-2020-10-01T02-44-49.406307Z.log.gz',
+            'BB-2020-10-01T03-36-14.186767Z.log.gz',
+            'BB-2020-10-01T04-27-59.817297Z.log.gz',
+            'BB-2020-10-01T05-19-36.804052Z.log.gz',
+            'BB-2020-10-01T06-11-06.849645Z.log.gz',
+            'BB-2020-10-01T07-02-24.289180Z.log.gz',
+            'BB-2020-10-01T07-54-13.840578Z.log.gz',
+            'BB-2020-10-01T08-45-42.229831Z.log.gz',
+            'BB-2020-10-01T09-37-01.732325Z.log.gz',
+            'BB-2020-10-01T10-28-16.647548Z.log.gz')
+
+        root_path = '../../DATA/BB/10/'
+
+        history1 = load_file(root_path+files[0])
+        history2 = load_file(root_path+files[1])
+        history3 = load_file(root_path+files[2])
+        history4 = load_file(root_path+files[3])
+
+        history1.merge_log(history2)
+        history1.setup_dollar_bar()
+        history1.update_price()
+        history1.update_q_value()
+        print(len(history1.dollar_bar))
+
+        history2.merge_log(history3)
+        history2.setup_dollar_bar()
+        history2.update_price()
+        history2.update_q_value()
+        print(len(history2.dollar_bar))
+
+        history3.merge_log(history4)
+        history3.setup_dollar_bar()
+        history3.update_price()
+        history3.update_q_value()
+        print(len(history3.dollar_bar))
+
+        history1.merge_dollar_bar(history2)
+        print(len(history1.dollar_bar))
+        history1.merge_dollar_bar(history3)
+        print(len(history1.dollar_bar))
+
+        print(history1.dollar_bar)
+
+
 
 if __name__ == '__main__':
     unittest.main()

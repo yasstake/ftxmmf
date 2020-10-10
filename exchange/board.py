@@ -66,6 +66,7 @@ def _chop_log_data(df, *, start=None, end=None, time_key=TIME):
 
     if len(df) == 0:
         print('chop too short', start, end)
+        # raise str('error')
 
     return df
 
@@ -143,6 +144,7 @@ class History:
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
         self.dollar_bar = None
+        self.q_window = 180
 
         if file:
             self._load(file)
@@ -150,9 +152,15 @@ class History:
     def load(self, file):
         if self.log_data is not None:
             append_history = History(file)
-            self.merge(append_history)
+            self.merge_log(append_history)
+            self.merge_dollar_bar(append_history)
         else:
             self._load(file)
+
+    def loads(self, files):
+        for file in files:
+            history = History(file)
+            self.merge_log(history)
 
     def _load(self, file):
         names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
@@ -164,12 +172,33 @@ class History:
         self.update_log_time_frame()
 
     def merge(self, history):
+        self.merge_log(history)
+        self.merge_dollar_bar(history)
+
+    def merge_log(self, history):
+        # merge row log
         cut_time = history.start_time
         self.trim_after(cut_time)
         df = pd.concat([self.log_data, history.log_data], ignore_index=True)
         df.reset_index(inplace=True, drop=True)
         self.log_data = df
         self.update_log_time_frame()
+
+    def merge_dollar_bar(self, history):
+        # merge dollar bar
+        if self.dollar_bar is None:
+            self.setup_dollar_bar()
+
+        if history.dollar_bar is None:
+            history.setup_dollar_bar()
+
+        cut_time = history.dollar_bar.iloc[0]['time_stamp']
+        df = self.dollar_bar[(self.dollar_bar['time_stamp'] < cut_time)]
+        df.reset_index(inplace=True, drop=True)
+        self.dollar_bar = df
+        df = pd.concat([self.dollar_bar, history.dollar_bar], ignore_index=True)
+        df.reset_index(inplace=True, drop=True)
+        self.dollar_bar = df
 
     def chop_max_time_width(self):
         """
@@ -255,12 +284,12 @@ class History:
 
     def _select_board_df(self, time):
         time = timestamp(time)
-        start_time = time - self.board_time_width
-        df = _chop_log_data(self.log_data, start=start_time, end=time)
+        # start_time = time - self.board_time_width
+        df = _chop_log_data(self.log_data, end=time)
         partial_index = self._get_last_partial_index(df)
         if partial_index is None:
             print(self.board_time_width)
-            print('short->', time, start_time, self.start_time, self.end_time)
+            print('short->', time, self.start_time, self.end_time)
         df = df.iloc[partial_index:]
 
         return df
@@ -389,17 +418,20 @@ class History:
         df['bs_ratio'] = df['buy_volume'] / (df['sell_volume']+df['buy_volume'])
         self.dollar_bar = df
 
+        '''
         self.dollar_bar['market_buy'] = None
         self.dollar_bar['market_sell'] = None
         self.dollar_bar['limit_buy'] = None
         self.dollar_bar['limit_sell'] = None
+        '''
 
         return df
 
     def _calc_order_price(self, row, delay=1, window=60, volume=1):
+        '''
         if row['market_buy']:
             return pd.Series([row['market_buy'], row['market_sell'], row['limit_buy'], row['limit_sell']])
-
+        '''
         time = row['time_stamp']
         if not time:
             print(time)
@@ -443,9 +475,8 @@ class History:
         dollar_bar = self.dollar_bar.iloc[row.index:]
         '''
 
-        dollar_bar = _chop_log_data(self.dollar_bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=60),
+        dollar_bar = _chop_log_data(self.dollar_bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=self.q_window),
                                     time_key='time_stamp')
-
 
         min_df = dollar_bar.min()
         max_df = dollar_bar.max()
@@ -497,6 +528,7 @@ def load_file(file) -> History:
     :return history object
     '''
     return History(file)
+
 
 
 if __name__ == "__main__":
