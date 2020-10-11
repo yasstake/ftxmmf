@@ -12,6 +12,7 @@ CHECKSUM = 'checksum'
 
 PARTIAL_TIME = 600  # sec
 ORDER_WINDOW = 360
+Q_WINDOW = 360 * 2
 ORDER_DELAY = 3
 
 def timestamp(time) -> pd.Timestamp:
@@ -87,7 +88,7 @@ def execute_price(data, volume):
         if volume < v:
             return d[0]
 
-    print('NO EXECUTE')
+    # print('NO EXECUTE')
     return None
 
 
@@ -149,7 +150,7 @@ class History:
         self.partial_time_width = pd.Timedelta('10 m')
         self.board_time_width = pd.Timedelta('1 d')
         self.dollar_bar = None
-        self.q_window = 180
+        self.q_window = Q_WINDOW
 
         if file:
             self._load(file)
@@ -249,8 +250,8 @@ class History:
         :return: bit_edge_price, bit_edge_volume, bit_execute_price, ask_edge_price, ask_edge_volume, ask_execute_price
         '''
         bit, ask = self.get_board(time)
-        print('bit array->', bit)
-        print('ask array->', ask)
+        # print('bit array->', bit)
+        # print('ask array->', ask)
         try:
             bit_edge_price = bit[0][0]
             bit_edge_volume = bit[0][1]
@@ -388,13 +389,13 @@ class History:
         bit_execute_price, ask_execute_price = self.calc_limit_price(time+pd.Timedelta(seconds=delay),
                                                                      volume + bit_volume, volume + ask_volume, window)
 
-        print('bit->', bit_execute_price, ask_price)
+        # print('bit->', bit_execute_price, ask_price)
         if (bit_execute_price is None) or (bit_execute_price < ask_price):
             limit_bit_price = None
         else:
             limit_bit_price = ask_price
 
-        print('ask->', ask_execute_price, bit_price)
+        # print('ask->', ask_execute_price, bit_price)
         if (ask_execute_price is None) or (bit_price < ask_execute_price):
             limit_ask_price = None
         else:
@@ -461,29 +462,6 @@ class History:
         return pd.Series([bit_market_price, ask_market_price,
                           bit_execute_price, ask_execute_price])
 
-    '''
-    def _calc_order_price2(self, row, delay=1, window=ORDER_WINDOW, volume=0.1):
-        time = row['time_stamp']
-        if not time:
-            print(time)
-
-        bit_edge_price, bit_edge_volume, bit_market_price,\
-            ask_edge_price, ask_edge_volume, ask_market_price, = \
-                 self.get_board_prices(time, volume)
-
-        ask_volume = volume + ask_edge_volume
-        bit_volume = volume + bit_edge_volume
-
-        time = time + pd.Timedelta(seconds=delay)
-        window = pd.Timedelta(seconds=window)
-        long, short = self.select_execute(time, time+window)
-        bit_execute_price, ask_execute_price = \
-            execute_price(long, bit_volume), execute_price(short, ask_volume)
-
-        return pd.Series([bit_market_price, ask_market_price,
-                          bit_execute_price, ask_execute_price])
-    '''
-
     def update_price(self):
         self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
              self.dollar_bar.apply(self._calc_order_price, axis=1)
@@ -501,11 +479,6 @@ class History:
         market_sell = row['market_sell']
         limit_buy = row['limit_buy']
         limit_sell = row['limit_sell']
-
-        '''
-        print(row.index[0])
-        dollar_bar = self.dollar_bar.iloc[row.index:]
-        '''
 
         dollar_bar = _chop_log_data(self.dollar_bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=self.q_window),
                                     time_key='time_stamp')
