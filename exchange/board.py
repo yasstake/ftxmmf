@@ -136,6 +136,10 @@ def _filter_bit(df):
 def _filter_ask(df):
     return df[df[ACTION] == Action.UPDATE_ASK]
 
+class IndicatorMaker:
+    def __init__(self):
+        self.update = None
+        self.names = None
 
 class History:
     def __init__(self, file=None):
@@ -466,6 +470,10 @@ class History:
         self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
              self.dollar_bar.apply(self._calc_order_price, axis=1)
 
+    def update_indicator(self, indicator_maker: IndicatorMaker):
+        self.dollar_bar[indicator_maker.names] = \
+             self.dollar_bar.apply(indicator_maker.update, axis=1)
+
     def _calc_q_value(self, row):
         '''
         calc Q value for each action
@@ -534,6 +542,21 @@ def load_file(file) -> History:
     '''
     return History(file)
 
+
+def load_files(files) -> History:
+    history = None
+    for file in files:
+        history_append = load_file(file)
+        if history is None:
+            history = history_append
+        else:
+            history.merge_log(history_append)
+
+    history.setup_dollar_bar()
+    history.update_price()
+    history.update_q_value()
+
+    return history
 
 
 if __name__ == "__main__":
