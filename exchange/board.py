@@ -11,6 +11,8 @@ VOLUME = 'volume'
 CHECKSUM = 'checksum'
 
 PARTIAL_TIME = 600  # sec
+ORDER_WINDOW = 360
+ORDER_DELAY = 3
 
 def timestamp(time) -> pd.Timestamp:
     """
@@ -28,19 +30,19 @@ def timestamp(time) -> pd.Timestamp:
         return time
 
 
-def board_df_to_list(df, reverse=False):
+def board_df_to_list(df, ascending=True):
     """
     make [(price, volume),,,,] array
     :param df:
     :param reverse:
     :return:
     """
-    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=reverse)
+    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=ascending)
     return df.values.tolist()
 
 
-def execute_df_to_list(df, reverse=False):
-    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=reverse)
+def execute_df_to_list(df, ascending=False):
+    df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=ascending)
     return df.values.tolist()
 
 
@@ -81,8 +83,11 @@ def execute_price(data, volume):
     v = 0
     for d in data:
         v += d[1]
+        # print(d[0], ':', d[1], end=', ')
         if volume < v:
             return d[0]
+
+    print('NO EXECUTE')
     return None
 
 
@@ -231,8 +236,8 @@ class History:
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
-        bit_board = board_df_to_list(bit, False)
-        ask_board = board_df_to_list(ask, True)
+        bit_board = board_df_to_list(bit, True)
+        ask_board = board_df_to_list(ask, False)
 
         return bit_board, ask_board
 
@@ -241,9 +246,11 @@ class History:
 
         :param time:
         :param volume:
-        :return: bit_edge_price, bit_execute_price, ask_edge_price, ask_execute_price
+        :return: bit_edge_price, bit_edge_volume, bit_execute_price, ask_edge_price, ask_edge_volume, ask_execute_price
         '''
         bit, ask = self.get_board(time)
+        print('bit array->', bit)
+        print('ask array->', ask)
         try:
             bit_edge_price = bit[0][0]
             bit_edge_volume = bit[0][1]
@@ -254,8 +261,8 @@ class History:
             print('bit->', bit)
             print('ask->', ask)
 
-        bit_execute_price = execute_price(bit, volume)
-        ask_execute_price = execute_price(ask, volume)
+        bit_execute_price = execute_price(ask, volume)
+        ask_execute_price = execute_price(bit, volume)
 
         return bit_edge_price, bit_edge_volume, bit_execute_price,\
                ask_edge_price, ask_edge_volume, ask_execute_price
@@ -277,7 +284,7 @@ class History:
         ask = df[df[ACTION] == Action.UPDATE_ASK]
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
         ask = ask[ask[VOLUME] != 0]
-        if len(bit) == 0:
+        if len(ask) == 0:
             print('too short ask', time)
 
         return bit, ask
@@ -322,8 +329,9 @@ class History:
 
     def select_execute(self, start, end):
         long_df, short_df = self._select_execute_df(start, end)
-        long_list = execute_df_to_list(long_df, False)
-        short_list = execute_df_to_list(short_df, True)
+
+        long_list = execute_df_to_list(long_df, True)
+        short_list = execute_df_to_list(short_df, False)
 
         return long_list, short_list
 
@@ -353,13 +361,14 @@ class History:
         except IndexError:
             print('get board error', bit, ask)
 
-        # bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
-        bit_execute_price = execute_price(ask, volume+bit_volume)
-        ask_execute_price = execute_price(bit, volume+ask_volume)
+        # print('bit->')
+        bit_execute_price = execute_price(ask, volume)
+        # print('ask->')
+        ask_execute_price = execute_price(bit, volume)
 
         return _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_price)
 
-    def limit_price(self, time, volume=0, window=10, delay=1):
+    def limit_price(self, time, volume=0, window=180, delay=3):
         '''
         TODO: adding execution time.
         :param time:
@@ -368,26 +377,40 @@ class History:
         :param delay: delay time to execute
         :return: bit_price, ask_price
         '''
-        time = time + pd.Timedelta(seconds=delay)
-        bit_price, bit_volume, ask_price, ask_volume = self._get_board_price(time)
+        bit, ask = self.get_board(time)
+        bit_price = bit[0][0]
+        bit_volume = bit[0][1]
+        ask_price = ask[0][0]
+        ask_volume = ask[0][1]
 
-        # todo: bit_volume and ask_volume must be setup by separately
-        bit_execute_price, ask_execute_price = self.calc_limit_price(time, volume + bit_volume + ask_volume, window)
+        # bit_price, bit_volume, _, ask_price, ask_volume, _ = self.get_board_prices(time, volume=0)
 
-        if (ask_execute_price is None) or (bit_price < ask_execute_price):
-            bit_price = None
+        bit_execute_price, ask_execute_price = self.calc_limit_price(time+pd.Timedelta(seconds=delay),
+                                                                     volume + bit_volume, volume + ask_volume, window)
 
+        print('bit->', bit_execute_price, ask_price)
         if (bit_execute_price is None) or (bit_execute_price < ask_price):
-            ask_price = None
+            limit_bit_price = None
+        else:
+            limit_bit_price = ask_price
 
-        return bit_price, ask_price
+        print('ask->', ask_execute_price, bit_price)
+        if (ask_execute_price is None) or (bit_price < ask_execute_price):
+            limit_ask_price = None
+        else:
+            limit_ask_price = bit_price
 
-    def calc_limit_price(self, time, volume=0, window=10, delay=1):
+        return limit_bit_price, limit_ask_price
+
+    def calc_limit_price(self, time, long_volume=0, short_volume=0, window=180, delay=1):
         time = time + pd.Timedelta(seconds=delay)
         window = pd.Timedelta(seconds=window)
         long, short = self.select_execute(time, time+window)
 
-        return execute_price(long, volume), execute_price(short, volume)
+        long_execute_price = execute_price(long, long_volume)
+        short_execute_price = execute_price(short, short_volume)
+
+        return long_execute_price, short_execute_price
 
     def setup_dollar_bar(self, tick_vol=5):
         """
@@ -427,18 +450,26 @@ class History:
 
         return df
 
-    def _calc_order_price(self, row, delay=1, window=60, volume=1):
-        '''
-        if row['market_buy']:
-            return pd.Series([row['market_buy'], row['market_sell'], row['limit_buy'], row['limit_sell']])
-        '''
+    def _calc_order_price(self, row, delay=ORDER_DELAY, window=ORDER_WINDOW, volume=0.1):
         time = row['time_stamp']
         if not time:
             print(time)
 
-        ask_edge_price, ask_edge_volume, ask_market_price,\
-            bit_edge_price, bit_edge_volume, bit_market_price = \
-                  self.get_board_prices(time, volume)
+        bit_market_price, ask_market_price = self.market_price(time, volume=volume)
+        bit_execute_price, ask_execute_price = self.limit_price(time, delay=delay, volume=volume, window=window)
+
+        return pd.Series([bit_market_price, ask_market_price,
+                          bit_execute_price, ask_execute_price])
+
+    '''
+    def _calc_order_price2(self, row, delay=1, window=ORDER_WINDOW, volume=0.1):
+        time = row['time_stamp']
+        if not time:
+            print(time)
+
+        bit_edge_price, bit_edge_volume, bit_market_price,\
+            ask_edge_price, ask_edge_volume, ask_market_price, = \
+                 self.get_board_prices(time, volume)
 
         ask_volume = volume + ask_edge_volume
         bit_volume = volume + bit_edge_volume
@@ -451,6 +482,7 @@ class History:
 
         return pd.Series([bit_market_price, ask_market_price,
                           bit_execute_price, ask_execute_price])
+    '''
 
     def update_price(self):
         self.dollar_bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
