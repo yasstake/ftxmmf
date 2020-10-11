@@ -475,7 +475,8 @@ class MyTestCase(unittest.TestCase):
 
         print(history1.dollar_bar)
 
-
+    def test_load_globs(self):
+        load_directory('../../DATA/BB/05/BB-2020-05-09T0*.log.gz')
 
 if __name__ == '__main__':
     unittest.main()

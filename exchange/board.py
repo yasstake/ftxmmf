@@ -1,6 +1,9 @@
+import glob
+import time
 import pandas as pd
 import numpy as np
 from logger.util import Action
+
 import matplotlib as plt
 
 TIME = 'time'
@@ -557,6 +560,31 @@ def load_files(files) -> History:
     history.update_q_value()
 
     return history
+
+
+def load_directory(pattern) -> History:
+    file1 = None
+    file2 = None
+    history = None
+
+    for file in sorted(glob.glob(pattern)):
+        file1 = file2
+        file2 = file
+
+        if file1 and file2:
+            t = time.time()
+            h = load_files((file1, file2))
+            print(time.time() - t, file1, file2)
+            if history is None:
+                history = h
+            else:
+                t = time.time()
+                history.merge(h)
+                print('merged', time.time() - t)
+
+    return history
+
+
 
 
 if __name__ == "__main__":
