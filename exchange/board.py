@@ -139,6 +139,77 @@ def _filter_bit(df):
 def _filter_ask(df):
     return df[df[ACTION] == Action.UPDATE_ASK]
 
+
+class LogMerge:
+    def __init__(self):
+        self.log_data = None
+        self.start_time = None
+        self.end_time = None
+
+    def append_directory(self, log_directory):
+        for file_path in sorted(glob.glob(log_directory)):
+            print(file_path)
+            self.append(file_path)
+
+    def append(self, log_file):
+        if self.log_data is not None:
+            log = LogMerge()
+            log._load(log_file)
+            self.merge_log(log)
+        else:
+            self._load(log_file)
+
+    def file_name(self):
+        """
+
+        """
+        t1 = timestamp(int(self.start_time/1000_000))
+        t2 = timestamp(int(self.end_time/1000_000))
+
+        return t1.strftime('%Y%m%d%H-%m%S--') + t2.strftime('%Y%m%d%H-%m%S')
+
+
+    def dump(self):
+        self.log_data.to_csv('./out.csv.gz')
+
+    def _load(self, file):
+        names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
+        df = pd.read_csv(file, names=names)
+
+        self.log_data = df
+        self.update_log_time_frame()
+        print(file, self.file_name())
+
+    def trim_after(self, end_time):
+        df = self.log_data[(self.log_data['time'] < end_time)]
+        df.reset_index(inplace=True, drop=True)
+        self.log_data = df
+        self.update_log_time_frame()
+
+    def merge_log(self, log):
+        # merge row log
+        cut_time = log.start_time
+        self.trim_after(cut_time)
+        df = pd.concat([self.log_data, log.log_data], ignore_index=True)
+        df.reset_index(inplace=True, drop=True)
+        self.log_data = df
+        self.update_log_time_frame()
+
+    def update_log_time_frame(self):
+        """
+        initialize start_time and end_time accroding to the trade log.
+        """
+        df = self.log_data
+
+        partial = df[df[ACTION] == Action.PARTIAL]
+        first_partial_rec = partial.index[0]
+        last_rec = df.shape[0] - 1
+
+        self.start_time = df.loc[first_partial_rec]['time']
+        self.end_time = df.loc[last_rec]['time']
+        self.log_data = self.log_data[first_partial_rec:]
+
+
 class IndicatorMaker:
     def __init__(self):
         self.update = None
