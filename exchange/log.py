@@ -1,7 +1,5 @@
 import glob
-import time
 import pandas as pd
-import numpy as np
 from logger.util import Action
 
 TIME = 'time'
@@ -43,11 +41,9 @@ def board_df_to_list(df, ascending=True):
     df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=ascending)
     return df.values.tolist()
 
-
 def execute_df_to_list(df, ascending=False):
     df = df[[PRICE, VOLUME]].sort_values(PRICE, ascending=ascending)
     return df.values.tolist()
-
 
 def _chop_log_data(df, *, start=None, end=None, time_key=TIME):
     """
@@ -129,18 +125,18 @@ def _filter_execute(df):
 
 
 def _filter_bit(df):
-    return df[df[ACTION].isin([Action.UPDATE_BIT, Action.PARTIAL])]
+    return df[df[ACTION].isin([Action.UPDATE_BIT])]
 
 
 def _filter_ask(df):
-    return df[df[ACTION].isin([Action.UPDATE_ASK, Action.PARTIAL])]
+    return df[df[ACTION].isin([Action.UPDATE_ASK])]
 
 def _filter_partial(df):
     return df[df[ACTION].isin([Action.PARTIAL])]
 
 
 
-class LogLoad:
+class Trade:
     def __init__(self):
         self.log_data = None
         self.start_time = None
@@ -159,7 +155,7 @@ class LogLoad:
 
     def append(self, log_file):
         if self.log_data is not None:
-            log = LogLoad()
+            log = Trade()
             log._load(log_file)
             self.merge_log(log)
         else:
@@ -172,21 +168,115 @@ class LogLoad:
         self.ask_log = _filter_ask(self.log_data)
         self.partial_log = _filter_partial(self.log_data)
 
-    def last_partial_index(self, t):
+    def last_partial_index(self, time):
+        '''
+        get partial index before and after one rec accoding to time
+        :param time:
+        :return: before_index, after_idnex
+        '''
         df = self.partial_log
-        df = df[((t - self.partial_time_width) < df[TIME]) & (df[TIME] <= t)]
+        # df = df[((time - self.partial_time_width) < df[TIME]) & (df[TIME] <= time)]
+        df = df[df[TIME] <= time]
 
         if len(df) == 0:
             print('TOO SHORT DATA(partial record is not found)')
             return None
 
         df = df[-1:]
-        df_index = df.index[0]
-        return df_index
 
+        df = self.partial_log.loc[df.index[0]:].head(2)
+
+        if 1 < len(df):
+            return df.index[0], df.index[1]
+        elif 1 == len(df):
+            return df.index[0], None
+        else:
+            print('[error] partial index not found')
+            return None
+
+    def cut_partial_df(self, df, time):
+        index_before, index_after = self.last_partial_index(time)
+        df = df.loc[index_before:index_after]
+        df = df[df[TIME] < time]
+
+        return df
 
     def update_tick_board(self):
         pass
+
+    def get_board(self, time):
+        bit, ask = self._get_board_df(time)
+        bit_board = board_df_to_list(bit, True)
+        ask_board = board_df_to_list(ask, False)
+        return bit_board, ask_board
+
+    def _get_board_df(self, time):
+        bit = self.cut_partial_df(self.bit_log, time)
+        bit = bit.drop_duplicates(subset=PRICE, keep='last')
+        bit = bit[bit[VOLUME] != 0]
+
+        ask = self.cut_partial_df(self.ask_log, time)
+        ask = ask.drop_duplicates(subset=PRICE, keep='last')
+        ask = ask[ask[VOLUME] != 0]
+
+        return bit, ask
+
+    def calc_best_prices(self, time, volume=1):
+        bit_edge_price, bit_edge_volume, bit_execute_price, \
+            ask_edge_price, ask_edge_volume, ask_execute_price = self.calc_board_prices(time, volume)
+
+        long_price, short_price = self.calc_limit_price(time)
+
+        if long_price and long_price < bit_edge_price:
+            long_price = None
+
+        if short_price and ask_edge_price < short_price:
+            short_price = None
+
+        return long_price, short_price, bit_execute_price, ask_execute_price
+
+    def calc_board_prices(self, time, volume):
+        '''
+
+        :param time:
+        :param volume:
+        :return: bit_edge_price, bit_edge_volume, bit_execute_price, ask_edge_price, ask_edge_volume, ask_execute_price
+        '''
+        bit, ask = self.get_board(time)
+        # print('bit array->', bit)
+        # print('ask array->', ask)
+        try:
+            bit_edge_price = bit[0][0]
+            bit_edge_volume = bit[0][1]
+            ask_edge_price = ask[0][0]
+            ask_edge_volume = ask[0][1]
+        except IndexError:
+            print('Index error', time)
+            print('bit->', bit)
+            print('ask->', ask)
+
+        bit_execute_price = execute_price(ask, volume)
+        ask_execute_price = execute_price(bit, volume)
+
+        return bit_edge_price, bit_edge_volume, bit_execute_price,\
+               ask_edge_price, ask_edge_volume, ask_execute_price
+
+    def calc_limit_price(self, time, long_volume=0, short_volume=0, window=180, delay=1):
+        time = time + pd.Timedelta(seconds=delay)
+        window = pd.Timedelta(seconds=window)
+        long_df = _chop_log_data(self.long_log, start=time, end=time+window)
+        short_df = _chop_log_data(self.short_log, start=time, end=time+window)
+
+        long_df = long_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
+        short_df = short_df[[PRICE, VOLUME]].groupby([PRICE], as_index=False).sum()
+
+        long_list = execute_df_to_list(long_df, True)
+        short_list = execute_df_to_list(short_df, False)
+
+        long_execute_price = execute_price(long_list, long_volume)
+        short_execute_price = execute_price(short_list, short_volume)
+
+        return long_execute_price, short_execute_price
 
     def file_name(self):
         """
@@ -237,4 +327,3 @@ class LogLoad:
         self.start_time = df.loc[first_partial_rec]['time']
         self.end_time = df.loc[last_rec]['time']
         self.log_data = self.log_data[first_partial_rec:]
-
