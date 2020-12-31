@@ -133,9 +133,9 @@ class BybitClient:
         for rec in line:
             side = rec['side']
             if side == 'Sell':
-                action = Action.UPDATE_BIT
+                action = Action.UPDATE_SELL
             elif side == 'Buy':
-                action = Action.UPDATE_ASK
+                action = Action.UPDATE_BUY
             else:
                 print('error unknown side')
 
@@ -164,9 +164,9 @@ class BybitClient:
 
         action = 0
         if side == 'Sell':
-            action = Action.TRADE_SHORT
+            action = Action.TRADE_SELL
         elif side == 'Buy':
-            action = Action.TRADE_LONG
+            action = Action.TRADE_BUY
         else:
             print('ERROR')
 

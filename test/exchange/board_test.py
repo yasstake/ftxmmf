@@ -266,8 +266,8 @@ class MyTestCase(unittest.TestCase):
         list_c = []
         d_df = pd.DataFrame()
         for index, row in df.iterrows():
-            if row.action in [Action.TRADE_LONG,Action.TRADE_SHORT_LIQUID,
-                               Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]:
+            if row.action in [Action.TRADE_BUY, Action.TRADE_SELL_LIQUID,
+                              Action.TRADE_SELL, Action.TRADE_SELL_LIQUID]:
 
                 price = row.price
                 if not o:
@@ -359,9 +359,9 @@ class MyTestCase(unittest.TestCase):
         for index, row in df.iterrows():
             row_count = row_count + 1
             if partial:
-                if row.action == Action.UPDATE_ASK:
+                if row.action == Action.UPDATE_BUY:
                     order_book.set_asks(row.price, row.volume)
-                elif row.action == Action.UPDATE_BIT:
+                elif row.action == Action.UPDATE_SELL:
                     order_book.set_bids(row.price, row.volume)
 
             if row.action == Action.PARTIAL:

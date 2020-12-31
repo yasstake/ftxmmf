@@ -72,15 +72,15 @@ class Action:
     # board
     # action, time, sequence, price, volume, checksum
     PARTIAL = 1
-    UPDATE_BIT = 2
-    UPDATE_ASK = 3
+    UPDATE_SELL = 2
+    UPDATE_BUY = 3
 
     # trade
-    TRADE_LONG = 4
-    TRADE_LONG_LIQUID = 5
+    TRADE_BUY = 4
+    TRADE_BUY_LIQUID = 5
 
-    TRADE_SHORT = 6
-    TRADE_SHORT_LIQUID = 7
+    TRADE_SELL = 6
+    TRADE_SELL_LIQUID = 7
 
     # Open Interest
     # action, time, 0,, volume,

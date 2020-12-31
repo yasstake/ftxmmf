@@ -99,11 +99,11 @@ class BfClient:
     def _board_to_csv(self, bids, asks):
         for board in bids:
             price, size = board['price'], board['size']
-            self.log.write_action(Action.UPDATE_BIT, self.current_time, price, size)
+            self.log.write_action(Action.UPDATE_SELL, self.current_time, price, size)
 
         for board in asks:
             price, size = board['price'], board['size']
-            self.log.write_action(Action.UPDATE_ASK, self.current_time, price, size)
+            self.log.write_action(Action.UPDATE_BUY, self.current_time, price, size)
 
     def _trade_message_to_csv(self, message):
         message = message.replace("'", '"')
@@ -125,9 +125,9 @@ class BfClient:
 
         action = 0
         if side == 'SELL':
-            action = Action.TRADE_SHORT
+            action = Action.TRADE_SELL
         elif side == 'BUY':
-            action = Action.TRADE_LONG
+            action = Action.TRADE_BUY
         else:
             print('ERROR')
 

@@ -116,6 +116,7 @@ class MyTestCase(unittest.TestCase):
         print(bar.bar['low'])
 
         pd.set_option('display.max_columns', 100)
+        pd.set_option('display.max_rows', 500)
         print(bar.bar)
 
     def test_log_dollarbar(self):

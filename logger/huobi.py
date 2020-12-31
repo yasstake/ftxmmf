@@ -148,9 +148,9 @@ class HuobiClient:
 
         action = 0
         if side == 'SELL':
-            action = Action.TRADE_SHORT
+            action = Action.TRADE_SELL
         elif side == 'BUY':
-            action = Action.TRADE_LONG
+            action = Action.TRADE_BUY
         else:
             print('ERROR')
 

@@ -110,13 +110,13 @@ class FtxClient:
             bid_price = board[0]
             bid_size = board[1]
             self.order_book.set_bids(bid_price, bid_size)
-            self.log.write_action(Action.UPDATE_BIT, time, bid_price, bid_size)
+            self.log.write_action(Action.UPDATE_SELL, time, bid_price, bid_size)
 
         for board in asks:
             ask_price = board[0]
             ask_size = board[1]
             self.order_book.set_asks(ask_price, ask_size)
-            self.log.write_action(Action.UPDATE_ASK, time, ask_price, ask_size)
+            self.log.write_action(Action.UPDATE_BUY, time, ask_price, ask_size)
 
         if len(bids) or len(asks):
             self.log.write_check_sum(checksum)
@@ -145,9 +145,9 @@ class FtxClient:
 
         action = 0
         if side == 'sell':
-            action = Action.TRADE_SHORT
+            action = Action.TRADE_SELL
         elif side == 'buy':
-            action = Action.TRADE_LONG
+            action = Action.TRADE_BUY
         else:
             print('ERROR')
 

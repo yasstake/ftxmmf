@@ -113,24 +113,24 @@ def _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_pri
 
 
 def _filter_long(df):
-    return df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_BUY, Action.TRADE_BUY_LIQUID])]
 
 
 def _filter_short(df):
-    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID])]
 
 
 def _filter_execute(df):
-    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID,
-                                         Action.TRADE_LONG, Action.TRADE_SHORT_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_BUY_LIQUID,
+                               Action.TRADE_BUY, Action.TRADE_SELL_LIQUID])]
 
 
 def _filter_bit(df):
-    return df[df[ACTION].isin([Action.UPDATE_BIT])]
+    return df[df[ACTION].isin([Action.UPDATE_BUY])]
 
 
 def _filter_ask(df):
-    return df[df[ACTION].isin([Action.UPDATE_ASK])]
+    return df[df[ACTION].isin([Action.UPDATE_SELL])]
 
 
 def _filter_partial(df):
@@ -207,8 +207,9 @@ class Trade:
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
-        bit_board = board_df_to_list(bit, True)
-        ask_board = board_df_to_list(ask, False)
+        bit_board = board_df_to_list(bit, False)
+        ask_board = board_df_to_list(ask, True)
+
         return bit_board, ask_board
 
     def _get_board_df(self, time):
@@ -223,21 +224,31 @@ class Trade:
         return bit, ask
 
     def calc_best_prices(self, time, volume=1):
-        bit_edge_price, bit_edge_volume, bit_execute_price, \
-            ask_edge_price, ask_edge_volume, ask_execute_price = self.calc_board_prices(time, volume)
+        bit_edge_price, bit_edge_volume, market_buy, \
+            ask_edge_price, ask_edge_volume, market_sell = self.calc_board_prices(time, volume)
 
-        long_price, short_price = self.calc_limit_price(time)
+        long_volume = ask_edge_volume + volume
+        short_volume = bit_edge_volume + volume
 
-        if long_price and long_price < bit_edge_price:
-            long_price = None
+        limit_buy, limit_sell = self.calc_limit_price(time, long_volume=long_volume, short_volume=short_volume)
 
-        if short_price and ask_edge_price < short_price:
-            short_price = None
+        if limit_buy and limit_buy < ask_edge_price:
+            limit_buy = ask_edge_price
+        else:
+            limit_buy = None
 
-        return long_price, short_price, bit_execute_price, ask_execute_price
+        if limit_sell and bit_edge_price < limit_sell:
+            limit_sell = bit_edge_price
+        else:
+            limit_sell = None
+
+        return bit_edge_price, bit_edge_volume, ask_edge_price, ask_edge_volume, \
+               market_buy, market_sell, limit_buy, limit_sell
 
     def calc_board_prices(self, time, volume):
         '''
+        BID -> Sell
+        ASK -> Buy
 
         :param time:
         :param volume:
@@ -262,9 +273,10 @@ class Trade:
         return bit_edge_price, bit_edge_volume, bit_execute_price,\
                ask_edge_price, ask_edge_volume, ask_execute_price
 
-    def calc_limit_price(self, time, long_volume=0, short_volume=0, window=180, delay=1):
+    def calc_limit_price(self, time, long_volume=1, short_volume=1, window=360, delay=3):
         time = time + pd.Timedelta(seconds=delay)
         window = pd.Timedelta(seconds=window)
+
         long_df = _chop_log_data(self.long_log, start=time, end=time+window)
         short_df = _chop_log_data(self.short_log, start=time, end=time+window)
 
@@ -295,6 +307,7 @@ class Trade:
         names = (ACTION, TIME, SEQ, PRICE, VOLUME, CHECKSUM)
         df = pd.read_csv(file, names=names)
         df[TIME] = pd.to_datetime(df[TIME] * 1000)
+        df[PRICE] = df[PRICE] / 10
 
         self.log_data = df
         self.update_log_time_frame()
@@ -342,8 +355,8 @@ class TradeBar:
         df = trade.exec_log.copy()
         # df = df.set_index('time')
         df['time'] = df['time'].dt.ceil('20s')
-        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
-        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_BUY, Action.TRADE_BUY_LIQUID]), 'buy_volume'] = df['volume']
 
         df = df.groupby('time').agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
                                    'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
@@ -362,8 +375,8 @@ class TradeBar:
         # df = df.set_index('time')
         df['sum'] = df[VOLUME].cumsum()  # 1BTC for each bin
         df['sum'] = np.floor(df['sum'] / var_volume)
-        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
-        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_BUY, Action.TRADE_BUY_LIQUID]), 'buy_volume'] = df['volume']
 
         df = df.groupby('sum').agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
                                     'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
@@ -380,17 +393,19 @@ class TradeBar:
         if not time:
             print(time)
 
-        long_price, short_price, bit_execute_price, ask_execute_price = \
+        board_bit, board_bit_vol, board_ask, board_ask_vol, \
+             long_price, short_price, bit_execute_price, ask_execute_price = \
              self.trade.calc_best_prices(time)
 
-        return pd.Series([long_price, short_price,
+        return pd.Series([board_bit, board_bit_vol, board_ask, board_ask_vol, long_price, short_price,
                           bit_execute_price, ask_execute_price])
 
     def update_price(self, trade: Trade = None):
         if trade:
             self.trade = Trade
 
-        self.bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
+        self.bar[['board_bit', 'board_bit_vol', 'board_ask', 'board_ask_vol',
+                  'market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
              self.bar.apply(self._calc_order_price, axis=1)
 
     '''

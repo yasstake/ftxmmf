@@ -93,15 +93,15 @@ class Market:
         data_after = self.df[(self.current_time <= self.df[TIME] & self.df[TIME] < self.current_time + self.time_window)]
 
         self.trade_long = data_after[
-            ((data_after[ACTION] == Action.TRADE_LONG) | (data_after[ACTION] == Action.TRADE_LONG_LIQUID))]
+            ((data_after[ACTION] == Action.TRADE_BUY) | (data_after[ACTION] == Action.TRADE_BUY_LIQUID))]
 
-        self.trade_short = data_after[((data_after[ACTION] == Action.TRADE_SHORT) |
-                                    (data_after[ACTION] == Action.TRADE_SHORT_LIQUID))]
+        self.trade_short = data_after[((data_after[ACTION] == Action.TRADE_SELL) |
+                                       (data_after[ACTION] == Action.TRADE_SELL_LIQUID))]
 
         data_before = self.df[(self.current_time - self.time_window <= self.df[TIME] & self.df[TIME] < self.current_time)]
 
-        self.bits = self._select_board_info(data_before, Action.UPDATE_ASK)
-        self.bits = self._select_board_info(data_before, Action.UPDATE_BIT)
+        self.bits = self._select_board_info(data_before, Action.UPDATE_BUY)
+        self.bits = self._select_board_info(data_before, Action.UPDATE_SELL)
 
     def _select_board_info(self, data_before, bit_or_ask):
         board = data_before[((data_before[ACTION] == Action.PARTIAL) | (data_before[ACTION] == bit_or_ask))]

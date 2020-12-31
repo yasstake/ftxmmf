@@ -115,14 +115,14 @@ class LogTable:
                 record = None
                 table = None
                 if action == Action.PARTIAL or \
-                    action == Action.UPDATE_ASK or \
-                    action == Action.UPDATE_BIT:
+                    action == Action.UPDATE_BUY or \
+                    action == Action.UPDATE_SELL:
                     record = self.board_record
                     table = self.board_table
-                elif action == Action.TRADE_LONG or \
-                    action == Action.TRADE_SHORT or \
-                    action == Action.TRADE_LONG_LIQUID or \
-                    action == Action.TRADE_SHORT_LIQUID:
+                elif action == Action.TRADE_BUY or \
+                    action == Action.TRADE_SELL or \
+                    action == Action.TRADE_BUY_LIQUID or \
+                    action == Action.TRADE_SELL_LIQUID:
                     record = self.trade_record
                     table = self.trade_table
                 else:

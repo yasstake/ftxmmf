@@ -120,24 +120,24 @@ def _calc_execute_price(bit_price, bit_execute_price, ask_price, ask_execute_pri
 
 
 def _filter_long(df):
-    return df[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_BUY, Action.TRADE_BUY_LIQUID])]
 
 
 def _filter_short(df):
-    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID])]
 
 
 def _filter_execute(df):
-    return df[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID,
-                                         Action.TRADE_LONG, Action.TRADE_SHORT_LIQUID])]
+    return df[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID,
+                               Action.TRADE_BUY, Action.TRADE_SELL_LIQUID])]
 
 
 def _filter_bit(df):
-    return df[df[ACTION] == Action.UPDATE_BIT]
+    return df[df[ACTION] == Action.UPDATE_SELL]
 
 
 def _filter_ask(df):
-    return df[df[ACTION] == Action.UPDATE_ASK]
+    return df[df[ACTION] == Action.UPDATE_BUY]
 
 
 class LogMerge:
@@ -354,13 +354,13 @@ class History:
         """
         df = self._select_board_df(time)
 
-        bit = df[df[ACTION] == Action.UPDATE_BIT]
+        bit = df[df[ACTION] == Action.UPDATE_SELL]
         bit = bit.drop_duplicates(subset=PRICE, keep='last')
         bit = bit[bit[VOLUME] != 0]
         if len(bit) == 0:
             print('too short bit', time)
 
-        ask = df[df[ACTION] == Action.UPDATE_ASK]
+        ask = df[df[ACTION] == Action.UPDATE_BUY]
         ask = ask.drop_duplicates(subset=PRICE, keep='last')
         ask = ask[ask[VOLUME] != 0]
         if len(ask) == 0:
@@ -499,8 +499,8 @@ class History:
         :return: dollar bar df.
         """
         df = _filter_execute(self.log_data).copy()
-        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
-        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_SELL, Action.TRADE_SELL_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_BUY, Action.TRADE_BUY_LIQUID]), 'buy_volume'] = df['volume']
         max_vol = df[VOLUME].sum()
         start = int(max_vol + tick_vol) - max_vol
 
