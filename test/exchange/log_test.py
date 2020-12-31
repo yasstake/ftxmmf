@@ -1,5 +1,6 @@
 import unittest
 from exchange.log import Trade
+from exchange.log import TradeBar
 from exchange.log import timestamp
 import pandas as pd
 
@@ -100,6 +101,38 @@ class MyTestCase(unittest.TestCase):
         long_price, short_price, bit_price, ask_price = self.log_loader.calc_best_prices(self.log_loader.start_time + pd.Timedelta('32m'))
 
         print(long_price, short_price, bit_price, ask_price)
+
+
+    def test_log_ohlcv_update(self):
+        self.log_load()
+        bar = TradeBar()
+        bar.setup_ochlv(self.log_loader)
+        print(bar.bar)
+        bar.update_price()
+
+        print(bar.bar['open'])
+        print(bar.bar['close'])
+        print(bar.bar['high'])
+        print(bar.bar['low'])
+
+        pd.set_option('display.max_columns', 100)
+        print(bar.bar)
+
+    def test_log_dollarbar(self):
+        self.log_load()
+        bar = TradeBar()
+        bar.setup_dollar_bar(self.log_loader, 1)
+        bar.update_price()
+
+        print(bar.bar['open'])
+        print(bar.bar['close'])
+        print(bar.bar['high'])
+        print(bar.bar['low'])
+
+        pd.set_option('display.max_columns', 100)
+        print(bar.bar)
+
+
 
 
 if __name__ == '__main__':

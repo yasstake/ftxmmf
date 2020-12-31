@@ -596,8 +596,7 @@ class History:
         return pd.Series([q_market_buy, q_market_sell, q_limit_buy, q_limit_sell])
 
     def update_q_value(self):
-        self.dollar_bar[['q_market_buy', 'q_market_sell', 'q_limit_buy', 'q_limit_sell']] = \
-            self.dollar_bar.apply(self._calc_q_value, axis=1)
+             self.dollar_bar.apply(self._calc_q_value, axis=1)
 
     def ochlv(self):
         df = _filter_execute(self.log_data).copy()

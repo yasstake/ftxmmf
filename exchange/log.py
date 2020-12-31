@@ -1,4 +1,5 @@
 import glob
+import numpy as np
 import pandas as pd
 from logger.util import Action
 
@@ -131,9 +132,9 @@ def _filter_bit(df):
 def _filter_ask(df):
     return df[df[ACTION].isin([Action.UPDATE_ASK])]
 
+
 def _filter_partial(df):
     return df[df[ACTION].isin([Action.PARTIAL])]
-
 
 
 class Trade:
@@ -143,10 +144,12 @@ class Trade:
         self.end_time = None
         self.short_log = None
         self.long_log = None
+        self.exec_log = None
         self.bit_log = None
         self.ask_log = None
         self.partial_log = None
         self.partial_time_width = pd.Timedelta('1 h')
+
 
     def append_directory(self, log_directory):
         for file_path in sorted(glob.glob(log_directory)):
@@ -164,6 +167,7 @@ class Trade:
     def update_logs(self):
         self.short_log = _filter_short(self.log_data)
         self.long_log = _filter_long(self.log_data)
+        self.exec_log = _filter_execute(self.log_data)
         self.bit_log = _filter_bit(self.log_data)
         self.ask_log = _filter_ask(self.log_data)
         self.partial_log = _filter_partial(self.log_data)
@@ -200,9 +204,6 @@ class Trade:
         df = df[df[TIME] < time]
 
         return df
-
-    def update_tick_board(self):
-        pass
 
     def get_board(self, time):
         bit, ask = self._get_board_df(time)
@@ -297,7 +298,7 @@ class Trade:
 
         self.log_data = df
         self.update_log_time_frame()
-        print(file, self.file_name())
+        print(file, self.file_name(), self.start_time, self.end_time)
 
     def trim_after(self, end_time):
         df = self.log_data[(self.log_data['time'] < end_time)]
@@ -326,4 +327,124 @@ class Trade:
 
         self.start_time = df.loc[first_partial_rec]['time']
         self.end_time = df.loc[last_rec]['time']
-        self.log_data = self.log_data[first_partial_rec:]
+
+        self.log_data = self.log_data[(self.start_time <= self.log_data['time']) & \
+                                      (self.log_data['time'] <= self.end_time)]
+
+
+class TradeBar:
+    def __init__(self):
+        self.bar = None
+        self.trade = None
+
+    def setup_ochlv(self, trade: Trade):
+        self.trade = trade
+        df = trade.exec_log.copy()
+        # df = df.set_index('time')
+        df['time'] = df['time'].dt.ceil('20s')
+        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
+
+        df = df.groupby('time').agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
+                                   'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
+        df.columns = ['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']
+        df.reset_index(drop=True, inplace=True)
+        df.index.name = 'time'
+        df = df[['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']]
+
+        df['bs_ratio'] = df['buy_volume'] / (df['sell_volume']+df['buy_volume'])
+
+        self.bar = df
+
+    def setup_dollar_bar(self, trade: Trade, var_volume=1):
+        self.trade = trade
+        df = trade.exec_log.copy()
+        # df = df.set_index('time')
+        df['sum'] = df[VOLUME].cumsum()  # 1BTC for each bin
+        df['sum'] = np.floor(df['sum'] / var_volume)
+        df.loc[df[ACTION].isin([Action.TRADE_SHORT, Action.TRADE_SHORT_LIQUID]), 'sell_volume'] = df['volume']
+        df.loc[df[ACTION].isin([Action.TRADE_LONG, Action.TRADE_LONG_LIQUID]), 'buy_volume'] = df['volume']
+
+        df = df.groupby('sum').agg({'time': 'last', 'price': ['first', 'last', 'max', 'min'],
+                                    'sell_volume': 'sum', 'buy_volume': 'sum'}, axis=1)
+        df.columns = ['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']
+        df.reset_index(drop=True, inplace=True)
+        df.index.name = 'time'
+        df = df[['time_stamp', 'open', 'close', 'high', 'low', 'sell_volume', 'buy_volume']]
+        df['bs_ratio'] = df['buy_volume'] / (df['sell_volume']+df['buy_volume'])
+
+        self.bar = df
+
+    def _calc_order_price(self, row, delay=ORDER_DELAY, window=ORDER_WINDOW, volume=0.1):
+        time = row['time_stamp']
+        if not time:
+            print(time)
+
+        long_price, short_price, bit_execute_price, ask_execute_price = \
+             self.trade.calc_best_prices(time)
+
+        return pd.Series([long_price, short_price,
+                          bit_execute_price, ask_execute_price])
+
+    def update_price(self, trade: Trade = None):
+        if trade:
+            self.trade = Trade
+
+        self.bar[['market_buy', 'market_sell', 'limit_buy', 'limit_sell']] = \
+             self.bar.apply(self._calc_order_price, axis=1)
+
+    '''
+    def update_indicator(self, indicator_maker: IndicatorMaker):
+        self.dollar_bar[indicator_maker.names] = \
+             self.dollar_bar.apply(indicator_maker.update, axis=1)
+    '''
+
+    def _calc_q_value(self, row):
+        '''
+        calc Q value for each action
+        TODO: trading free must be applied
+        :param row:
+        :return:
+        '''
+        time_stamp = row['time_stamp']
+
+        market_buy = row['market_buy']
+        market_sell = row['market_sell']
+        limit_buy = row['limit_buy']
+        limit_sell = row['limit_sell']
+
+        dollar_bar = _chop_log_data(self.bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=self.q_window),
+                                    time_key='time_stamp')
+
+        min_df = dollar_bar.min()
+        max_df = dollar_bar.max()
+
+        min_market_buy = min_df['market_buy']
+        min_limit_buy = min_df['limit_buy']
+
+        min_buy_price = min_market_buy
+        if min_limit_buy and min_limit_buy < min_buy_price:
+            min_buy_price = min_limit_buy
+
+        max_market_sell = max_df['market_sell']
+        max_limit_sell = max_df['limit_sell']
+
+        max_sell_price = max_market_sell
+        if max_limit_sell and max_market_sell < max_limit_sell:
+            max_sell_price = max_limit_sell
+
+        q_market_buy = max_sell_price - market_buy
+        q_market_sell = market_sell - min_buy_price
+
+        q_limit_buy = None
+        if limit_buy:
+            q_limit_buy = max_sell_price - limit_buy
+
+        q_limit_sell = None
+        if limit_sell:
+            q_limit_sell = limit_sell - min_buy_price
+
+        return pd.Series([q_market_buy, q_market_sell, q_limit_buy, q_limit_sell])
+
+    def update_q_value(self):
+        self.bar.apply(self._calc_q_value, axis=1)
