@@ -11,7 +11,8 @@ VOLUME = 'volume'
 CHECKSUM = 'checksum'
 
 PARTIAL_TIME = 600  # sec
-ORDER_WINDOW = 360
+EXEC_WINDOW =  600  # 10 min
+
 Q_WINDOW = 360 * 2
 ORDER_DELAY = 3
 
@@ -273,7 +274,7 @@ class Trade:
         return bit_edge_price, bit_edge_volume, bit_execute_price,\
                ask_edge_price, ask_edge_volume, ask_execute_price
 
-    def calc_limit_price(self, time, long_volume=1, short_volume=1, window=360, delay=3):
+    def calc_limit_price(self, time, long_volume=1, short_volume=1, window=EXEC_WINDOW, delay=3):
         time = time + pd.Timedelta(seconds=delay)
         window = pd.Timedelta(seconds=window)
 
@@ -388,7 +389,7 @@ class TradeBar:
 
         self.bar = df
 
-    def _calc_order_price(self, row, delay=ORDER_DELAY, window=ORDER_WINDOW, volume=0.1):
+    def _calc_order_price(self, row, delay=ORDER_DELAY, window=EXEC_WINDOW, volume=0.1):
         time = row['time_stamp']
         if not time:
             print(time)
@@ -428,21 +429,17 @@ class TradeBar:
         limit_buy = row['limit_buy']
         limit_sell = row['limit_sell']
 
-        dollar_bar = _chop_log_data(self.bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=self.q_window),
+        bar = _chop_log_data(self.bar, start=time_stamp, end=time_stamp + pd.Timedelta(seconds=Q_WINDOW),
                                     time_key='time_stamp')
 
-        min_df = dollar_bar.min()
-        max_df = dollar_bar.max()
-
-        min_market_buy = min_df['market_buy']
-        min_limit_buy = min_df['limit_buy']
+        min_market_buy = bar['market_buy'].min()
+        min_limit_buy = bar['limit_buy'].max()
+        max_market_sell = bar['market_sell'].min()
+        max_limit_sell = bar['limit_sell'].max()
 
         min_buy_price = min_market_buy
         if min_limit_buy and min_limit_buy < min_buy_price:
             min_buy_price = min_limit_buy
-
-        max_market_sell = max_df['market_sell']
-        max_limit_sell = max_df['limit_sell']
 
         max_sell_price = max_market_sell
         if max_limit_sell and max_market_sell < max_limit_sell:
@@ -462,4 +459,5 @@ class TradeBar:
         return pd.Series([q_market_buy, q_market_sell, q_limit_buy, q_limit_sell])
 
     def update_q_value(self):
-        self.bar.apply(self._calc_q_value, axis=1)
+        self.bar[['q_market_buy', 'q_market_sell', 'q_limit_buy', 'q_limit_sell']] = \
+              self.bar.apply(self._calc_q_value, axis=1)

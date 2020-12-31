@@ -133,6 +133,14 @@ class MyTestCase(unittest.TestCase):
         pd.set_option('display.max_columns', 100)
         print(bar.bar)
 
+    def test_q_value_updated(self):
+        self.log_load()
+        bar = TradeBar()
+        bar.setup_dollar_bar(self.log_loader, 1)
+        bar.update_price()
+
+        bar.update_q_value()
+        print(bar.bar)
 
 
 
